@@ -108,13 +108,14 @@ server.tool(
     chatId: z.string().describe("Chat ID or username (e.g. @username or numeric ID)"),
     text: z.string().describe("Message text"),
     replyTo: z.number().optional().describe("Message ID to reply to"),
+    parseMode: z.enum(["md", "html"]).optional().describe("Message format: md (Markdown) or html"),
   },
-  async ({ chatId, text, replyTo }) => {
+  async ({ chatId, text, replyTo, parseMode }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      await telegram.sendMessage(chatId, text, replyTo);
+      await telegram.sendMessage(chatId, text, replyTo, parseMode);
       return { content: [{ type: "text", text: `Message sent to ${chatId}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Send error: ${(e as Error).message}` }] };
@@ -162,7 +163,12 @@ server.tool(
 
     try {
       const messages = await telegram.getMessages(chatId, limit, offsetId);
-      const text = messages.map((m) => `[${m.date}] ${m.sender}: ${m.text}`).join("\n\n");
+      const text = messages
+        .map(
+          (m) =>
+            `[${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+        )
+        .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
@@ -210,7 +216,12 @@ server.tool(
 
     try {
       const messages = await telegram.searchMessages(chatId, query, limit);
-      const text = messages.map((m) => `[${m.date}] ${m.sender}: ${m.text}`).join("\n\n");
+      const text = messages
+        .map(
+          (m) =>
+            `[${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+        )
+        .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages found" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
@@ -351,6 +362,89 @@ server.tool(
       return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-send-file",
+  "Send a file to a Telegram chat",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    filePath: z.string().describe("Absolute path to file"),
+    caption: z.string().optional().describe("File caption"),
+  },
+  async ({ chatId, filePath, caption }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.sendFile(chatId, filePath, caption);
+      return { content: [{ type: "text", text: `File sent to ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Send file error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-download-media",
+  "Download media from a Telegram message",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    messageId: z.number().describe("Message ID containing media"),
+    downloadPath: z.string().describe("Absolute path to save file"),
+  },
+  async ({ chatId, messageId, downloadPath }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const path = await telegram.downloadMedia(chatId, messageId, downloadPath);
+      return { content: [{ type: "text", text: `Media downloaded to ${path}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Download error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-pin-message",
+  "Pin a message in a Telegram chat",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    messageId: z.number().describe("Message ID to pin"),
+    silent: z.boolean().default(false).describe("Pin without notification"),
+  },
+  async ({ chatId, messageId, silent }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.pinMessage(chatId, messageId, silent);
+      return { content: [{ type: "text", text: `Message ${messageId} pinned in ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Pin error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-unpin-message",
+  "Unpin a message in a Telegram chat",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    messageId: z.number().describe("Message ID to unpin"),
+  },
+  async ({ chatId, messageId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.unpinMessage(chatId, messageId);
+      return { content: [{ type: "text", text: `Message ${messageId} unpinned in ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Unpin error: ${(e as Error).message}` }] };
     }
   },
 );

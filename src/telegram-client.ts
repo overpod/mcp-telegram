@@ -221,12 +221,40 @@ export class TelegramService {
     };
   }
 
-  async sendMessage(chatId: string, text: string, replyTo?: number): Promise<void> {
+  async sendMessage(chatId: string, text: string, replyTo?: number, parseMode?: "md" | "html"): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
     await this.client.sendMessage(chatId, {
       message: text,
       ...(replyTo ? { replyTo } : {}),
+      ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
     });
+  }
+
+  async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.sendFile(chatId, { file: filePath, caption });
+  }
+
+  async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const messages = await this.client.getMessages(chatId, { ids: [messageId] });
+    const message = messages[0];
+    if (!message) throw new Error(`Message ${messageId} not found`);
+    if (!message.media) throw new Error(`Message ${messageId} has no media`);
+    const buffer = await this.client.downloadMedia(message);
+    if (!buffer) throw new Error("Failed to download media");
+    await writeFile(downloadPath, buffer as Buffer);
+    return downloadPath;
+  }
+
+  async pinMessage(chatId: string, messageId: number, silent = false): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.pinMessage(chatId, messageId, { notify: !silent });
+  }
+
+  async unpinMessage(chatId: string, messageId: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    await this.client.unpinMessage(chatId, messageId);
   }
 
   async getDialogs(
@@ -330,6 +358,29 @@ export class TelegramService {
     return { id: chatId, name: "Unknown", type: "unknown" };
   }
 
+  /** Extract media info from a message */
+  private extractMediaInfo(
+    media: Api.TypeMessageMedia | undefined,
+  ): { type: string; fileName?: string; size?: number } | undefined {
+    if (!media) return undefined;
+    if (media instanceof Api.MessageMediaPhoto) {
+      return { type: "photo" };
+    }
+    if (media instanceof Api.MessageMediaDocument && media.document instanceof Api.Document) {
+      const doc = media.document;
+      let type = "document";
+      let fileName: string | undefined;
+      for (const attr of doc.attributes) {
+        if (attr instanceof Api.DocumentAttributeVideo) type = "video";
+        else if (attr instanceof Api.DocumentAttributeAudio) type = "audio";
+        else if (attr instanceof Api.DocumentAttributeSticker) type = "sticker";
+        else if (attr instanceof Api.DocumentAttributeFilename) fileName = attr.fileName;
+      }
+      return { type, fileName, size: doc.size?.toJSNumber?.() ?? Number(doc.size) };
+    }
+    return undefined;
+  }
+
   /** Resolve sender ID to a display name */
   private async resolveSenderName(senderId: bigInt.BigInteger | undefined): Promise<string> {
     if (!senderId || !this.client) return "unknown";
@@ -359,6 +410,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
+      media?: { type: string; fileName?: string; size?: number };
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
@@ -369,6 +421,7 @@ export class TelegramService {
         text: m.message ?? "",
         sender: await this.resolveSenderName(m.senderId),
         date: new Date((m.date ?? 0) * 1000).toISOString(),
+        media: this.extractMediaInfo(m.media),
       })),
     );
     return results;
@@ -424,6 +477,7 @@ export class TelegramService {
       text: string;
       sender: string;
       date: string;
+      media?: { type: string; fileName?: string; size?: number };
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
@@ -437,6 +491,7 @@ export class TelegramService {
         text: m.message ?? "",
         sender: await this.resolveSenderName(m.senderId),
         date: new Date((m.date ?? 0) * 1000).toISOString(),
+        media: this.extractMediaInfo(m.media),
       })),
     );
     return results;
