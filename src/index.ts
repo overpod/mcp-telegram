@@ -129,13 +129,14 @@ server.tool(
   {
     limit: z.number().default(20).describe("Number of chats to return"),
     offsetDate: z.number().optional().describe("Unix timestamp offset for pagination"),
+    filterType: z.enum(["private", "group", "channel"]).optional().describe("Filter by chat type"),
   },
-  async ({ limit, offsetDate }) => {
+  async ({ limit, offsetDate, filterType }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      const dialogs = await telegram.getDialogs(limit, offsetDate);
+      const dialogs = await telegram.getDialogs(limit, offsetDate, filterType);
       const text = dialogs
         .map(
           (d) =>
@@ -445,6 +446,77 @@ server.tool(
       return { content: [{ type: "text", text: `Message ${messageId} unpinned in ${chatId}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Unpin error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-contacts",
+  "Get Telegram contacts list",
+  {
+    limit: z.number().default(50).describe("Number of contacts to return"),
+  },
+  async ({ limit }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const contacts = await telegram.getContacts(limit);
+      const text = contacts
+        .map((c) => `P ${c.name}${c.username ? ` (@${c.username})` : ""} (${c.id})${c.phone ? ` +${c.phone}` : ""}`)
+        .join("\n");
+      return { content: [{ type: "text", text: text || "No contacts" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-chat-members",
+  "Get members of a Telegram group or channel",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    limit: z.number().default(50).describe("Number of members to return"),
+  },
+  async ({ chatId, limit }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const members = await telegram.getChatMembers(chatId, limit);
+      const text = members.map((m) => `${m.name}${m.username ? ` (@${m.username})` : ""} (${m.id})`).join("\n");
+      return { content: [{ type: "text", text: text || "No members found" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-profile",
+  "Get detailed profile info of a Telegram user",
+  {
+    userId: z.string().describe("User ID or username"),
+  },
+  async ({ userId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const profile = await telegram.getProfile(userId);
+      const lines = [
+        `Name: ${profile.name}`,
+        `ID: ${profile.id}`,
+        ...(profile.username ? [`Username: @${profile.username}`] : []),
+        ...(profile.phone ? [`Phone: +${profile.phone}`] : []),
+        ...(profile.bio ? [`Bio: ${profile.bio}`] : []),
+        `Photo: ${profile.photo ? "yes" : "no"}`,
+        ...(profile.lastSeen ? [`Last seen: ${profile.lastSeen}`] : []),
+      ];
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
   },
 );

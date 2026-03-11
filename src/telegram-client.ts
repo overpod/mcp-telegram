@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type bigInt from "big-integer";
+import bigInt from "big-integer";
 import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
@@ -260,6 +260,7 @@ export class TelegramService {
   async getDialogs(
     limit = 20,
     offsetDate?: number,
+    filterType?: "private" | "group" | "channel",
   ): Promise<
     Array<{
       id: string;
@@ -269,13 +270,15 @@ export class TelegramService {
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const dialogs = await this.client.getDialogs({ limit, ...(offsetDate ? { offsetDate } : {}) });
-    return dialogs.map((d) => ({
+    const fetchLimit = filterType ? limit * 3 : limit;
+    const dialogs = await this.client.getDialogs({ limit: fetchLimit, ...(offsetDate ? { offsetDate } : {}) });
+    const mapped = dialogs.map((d) => ({
       id: d.id?.toString() ?? "",
       name: d.title ?? d.name ?? "Unknown",
       type: d.isGroup ? "group" : d.isChannel ? "channel" : "private",
       unreadCount: d.unreadCount,
     }));
+    return filterType ? mapped.filter((d) => d.type === filterType).slice(0, limit) : mapped;
   }
 
   async getUnreadDialogs(limit = 20): Promise<
@@ -495,5 +498,85 @@ export class TelegramService {
       })),
     );
     return results;
+  }
+
+  async getContacts(limit = 50): Promise<Array<{ id: string; name: string; username?: string; phone?: string }>> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const result = await this.client.invoke(new Api.contacts.GetContacts({ hash: bigInt(0) }));
+    if (!(result instanceof Api.contacts.Contacts)) return [];
+    const contacts: Array<{ id: string; name: string; username?: string; phone?: string }> = [];
+    for (const user of result.users) {
+      if (user instanceof Api.User) {
+        const parts = [user.firstName, user.lastName].filter(Boolean);
+        contacts.push({
+          id: user.id.toString(),
+          name: parts.join(" ") || "Unknown",
+          username: user.username ?? undefined,
+          phone: user.phone ?? undefined,
+        });
+      }
+    }
+    return contacts.slice(0, limit);
+  }
+
+  async getChatMembers(chatId: string, limit = 50): Promise<Array<{ id: string; name: string; username?: string }>> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const participants = await this.client.getParticipants(chatId, { limit });
+    const members: Array<{ id: string; name: string; username?: string }> = [];
+    for (const p of participants) {
+      if (p instanceof Api.User) {
+        const parts = [p.firstName, p.lastName].filter(Boolean);
+        members.push({
+          id: p.id.toString(),
+          name: parts.join(" ") || "Unknown",
+          username: p.username ?? undefined,
+        });
+      }
+    }
+    return members;
+  }
+
+  async getProfile(userId: string): Promise<{
+    id: string;
+    name: string;
+    username?: string;
+    phone?: string;
+    bio?: string;
+    photo: boolean;
+    lastSeen?: string;
+  }> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const entity = await this.client.getEntity(userId);
+    if (!(entity instanceof Api.User)) throw new Error("Entity is not a user");
+
+    const inputEntity = await this.client.getInputEntity(userId);
+    const fullResult = await this.client.invoke(
+      new Api.users.GetFullUser({ id: inputEntity as unknown as Api.TypeInputUser }),
+    );
+    const bio = fullResult.fullUser.about ?? undefined;
+
+    const parts = [entity.firstName, entity.lastName].filter(Boolean);
+    let lastSeen: string | undefined;
+    if (entity.status instanceof Api.UserStatusOnline) {
+      lastSeen = "online";
+    } else if (entity.status instanceof Api.UserStatusOffline) {
+      lastSeen = new Date(entity.status.wasOnline * 1000).toISOString();
+    } else if (entity.status instanceof Api.UserStatusRecently) {
+      lastSeen = "recently";
+    } else if (entity.status instanceof Api.UserStatusLastWeek) {
+      lastSeen = "last week";
+    } else if (entity.status instanceof Api.UserStatusLastMonth) {
+      lastSeen = "last month";
+    }
+
+    return {
+      id: entity.id.toString(),
+      name: parts.join(" ") || "Unknown",
+      username: entity.username ?? undefined,
+      phone: entity.phone ?? undefined,
+      bio,
+      photo: !!entity.photo,
+      lastSeen,
+    };
   }
 }
