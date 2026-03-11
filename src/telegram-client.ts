@@ -32,6 +32,16 @@ export class TelegramService {
     return false;
   }
 
+  /** Set session string in memory (for programmatic / hosted use) */
+  setSessionString(session: string): void {
+    this.sessionString = session;
+  }
+
+  /** Get the current session string (for external persistence) */
+  getSessionString(): string {
+    return this.sessionString;
+  }
+
   private async saveSession(session: string): Promise<void> {
     this.sessionString = session;
     await writeFile(SESSION_FILE, session, "utf-8");

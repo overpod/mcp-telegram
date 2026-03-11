@@ -4,6 +4,10 @@
   "description": "MCP server for Telegram userbot — 20 tools for messages, media, contacts & more. Built on GramJS/MTProto.",
   "type": "module",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./service": "./dist/telegram-client.js"
+  },
   "bin": {
     "mcp-telegram": "dist/cli.js"
   },
