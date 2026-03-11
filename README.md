@@ -1,5 +1,6 @@
 # MCP Telegram
 
+[![npm](https://img.shields.io/npm/v/@overpod/mcp-telegram)](https://www.npmjs.com/package/@overpod/mcp-telegram)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.27-green.svg)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,22 +22,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **Node.js** 18 or later
 - **Telegram API credentials** -- `API_ID` and `API_HASH` from [my.telegram.org](https://my.telegram.org)
 
-## Installation
-
-```bash
-git clone https://github.com/overpod/mcp-telegram.git
-cd mcp-telegram
-npm install
-```
-
-Create a `.env` file in the project root:
-
-```env
-TELEGRAM_API_ID=your_api_id
-TELEGRAM_API_HASH=your_api_hash
-```
-
-## Setup
+## Quick Start
 
 ### 1. Get Telegram API credentials
 
@@ -45,17 +31,48 @@ TELEGRAM_API_HASH=your_api_hash
 3. Create a new application (any name and platform).
 4. Copy the **App api_id** and **App api_hash**.
 
-### 2. First login
-
-Run the QR login utility:
+### 2. Login
 
 ```bash
-npm run login
+TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
 ```
 
-A QR code will appear in the terminal. Open Telegram on your phone, go to **Settings > Devices > Link Desktop Device**, and scan the code. The session is saved to `.telegram-session` and reused automatically on subsequent launches.
+A QR code will appear in the terminal. Open Telegram on your phone, go to **Settings > Devices > Link Desktop Device**, and scan the code. The session is saved to `~/.telegram-session` and reused automatically.
 
-## Usage with Claude
+### 3. Add to Claude
+
+```bash
+claude mcp add telegram -s user \
+  -e TELEGRAM_API_ID=YOUR_ID \
+  -e TELEGRAM_API_HASH=YOUR_HASH \
+  -- npx @overpod/mcp-telegram
+```
+
+That's it! Ask Claude to run `telegram-status` to verify.
+
+## Installation Options
+
+### npx (recommended, zero install)
+
+No need to clone or install anything. Just use `npx @overpod/mcp-telegram`.
+
+### Global install
+
+```bash
+npm install -g @overpod/mcp-telegram
+mcp-telegram          # run server
+mcp-telegram login    # QR login
+```
+
+### From source
+
+```bash
+git clone https://github.com/overpod/mcp-telegram.git
+cd mcp-telegram
+npm install && npm run build
+```
+
+## Usage with MCP Clients
 
 ### Claude Code (CLI)
 
@@ -63,10 +80,10 @@ A QR code will appear in the terminal. Open Telegram on your phone, go to **Sett
 claude mcp add telegram -s user \
   -e TELEGRAM_API_ID=YOUR_ID \
   -e TELEGRAM_API_HASH=YOUR_HASH \
-  -- npx tsx /absolute/path/to/mcp-telegram/src/index.ts
+  -- npx @overpod/mcp-telegram
 ```
 
-### Claude Desktop / VS Code Extension
+### Claude Desktop / Cursor / VS Code
 
 Add to your MCP configuration file:
 
@@ -75,7 +92,7 @@ Add to your MCP configuration file:
   "mcpServers": {
     "telegram": {
       "command": "npx",
-      "args": ["tsx", "/absolute/path/to/mcp-telegram/src/index.ts"],
+      "args": ["@overpod/mcp-telegram"],
       "env": {
         "TELEGRAM_API_ID": "YOUR_ID",
         "TELEGRAM_API_HASH": "YOUR_HASH"
@@ -95,7 +112,7 @@ const telegramMcp = new MCPClient({
   servers: {
     telegram: {
       command: "npx",
-      args: ["tsx", "/absolute/path/to/mcp-telegram/src/index.ts"],
+      args: ["@overpod/mcp-telegram"],
       env: {
         TELEGRAM_API_ID: process.env.TELEGRAM_API_ID!,
         TELEGRAM_API_HASH: process.env.TELEGRAM_API_HASH!,
@@ -104,8 +121,6 @@ const telegramMcp = new MCPClient({
   },
 });
 ```
-
-After adding, ask Claude to run `telegram-status` to verify the connection.
 
 ## Available Tools
 

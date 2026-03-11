@@ -1,21 +1,48 @@
 {
-  "name": "mcp-telegram",
-  "version": "1.0.0",
-  "description": "MCP server for Telegram userbot",
+  "name": "@overpod/mcp-telegram",
+  "version": "1.1.0",
+  "description": "MCP server for Telegram userbot — 20 tools for messages, media, contacts & more. Built on GramJS/MTProto.",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "mcp-telegram": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "login": "tsx src/qr-login-cli.ts",
+    "start": "node dist/index.js",
+    "login": "node dist/qr-login-cli.js",
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",
     "format": "biome format --write src/"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "telegram",
+    "gramjs",
+    "mtproto",
+    "userbot",
+    "claude",
+    "ai-tools"
+  ],
+  "author": "overpod",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/overpod/mcp-telegram.git"
+  },
+  "homepage": "https://github.com/overpod/mcp-telegram#readme",
+  "bugs": {
+    "url": "https://github.com/overpod/mcp-telegram/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "dotenv": "^17.3.1",

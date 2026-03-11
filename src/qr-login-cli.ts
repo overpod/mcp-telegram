@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 import "dotenv/config";
 import { exec } from "node:child_process";
 import { writeFile } from "node:fs/promises";
