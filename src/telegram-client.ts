@@ -356,20 +356,50 @@ export class TelegramService {
       };
     }
     if (entity instanceof Api.Channel) {
+      let membersCount = entity.participantsCount ?? undefined;
+      let description: string | undefined;
+      try {
+        const full = await this.client.invoke(
+          new Api.channels.GetFullChannel({ channel: entity }),
+        );
+        if (full.fullChat instanceof Api.ChannelFull) {
+          membersCount = membersCount ?? full.fullChat.participantsCount ?? undefined;
+          description = full.fullChat.about || undefined;
+        }
+      } catch {
+        // May fail for some channels — fall back to basic info
+      }
       return {
         id: entity.id.toString(),
         name: entity.title,
         type: entity.megagroup ? "group" : "channel",
         username: entity.username ?? undefined,
-        membersCount: entity.participantsCount ?? undefined,
+        description,
+        membersCount,
       };
     }
     if (entity instanceof Api.Chat) {
+      let membersCount = entity.participantsCount ?? undefined;
+      let description: string | undefined;
+      try {
+        const full = await this.client.invoke(
+          new Api.messages.GetFullChat({ chatId: entity.id }),
+        );
+        if (full.fullChat instanceof Api.ChatFull) {
+          if (!membersCount && full.fullChat.participants instanceof Api.ChatParticipants) {
+            membersCount = full.fullChat.participants.participants.length;
+          }
+          description = full.fullChat.about || undefined;
+        }
+      } catch {
+        // Fall back to basic info
+      }
       return {
         id: entity.id.toString(),
         name: entity.title,
         type: "group",
-        membersCount: entity.participantsCount ?? undefined,
+        description,
+        membersCount,
       };
     }
     return { id: chatId, name: "Unknown", type: "unknown" };
