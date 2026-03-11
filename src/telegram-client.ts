@@ -261,6 +261,23 @@ export class TelegramService {
     return downloadPath;
   }
 
+  async downloadMediaAsBuffer(chatId: string, messageId: number): Promise<{ buffer: Buffer; mimeType: string }> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const messages = await this.client.getMessages(chatId, { ids: [messageId] });
+    const message = messages[0];
+    if (!message) throw new Error(`Message ${messageId} not found`);
+    if (!message.media) throw new Error(`Message ${messageId} has no media`);
+    const buffer = await this.client.downloadMedia(message);
+    if (!buffer) throw new Error("Failed to download media");
+    const media = message.media as unknown as Record<string, unknown>;
+    const doc = media.document as unknown as Record<string, unknown> | undefined;
+    const photo = media.photo as unknown as Record<string, unknown> | undefined;
+    let mimeType = "application/octet-stream";
+    if (doc?.mimeType) mimeType = doc.mimeType as string;
+    else if (photo) mimeType = "image/jpeg";
+    return { buffer: buffer as Buffer, mimeType };
+  }
+
   async pinMessage(chatId: string, messageId: number, silent = false): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
     await this.client.pinMessage(chatId, messageId, { notify: !silent });
