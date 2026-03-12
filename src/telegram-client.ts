@@ -226,11 +226,12 @@ export class TelegramService {
 
       if (resolved) {
         const newSession = client.session.save() as unknown as string;
-        await client.destroy();
-        await this.saveSession(newSession);
-        // Reconnect with new session
+        // Adopt the QR login client directly instead of destroy+reconnect
+        // This avoids creating a second Telegram session from DC migration auth keys
+        this.client = client;
         this.sessionString = newSession;
-        await this.connect();
+        this.connected = true;
+        await this.saveSession(newSession);
         return { success: true, message: "Telegram login successful" };
       }
 
