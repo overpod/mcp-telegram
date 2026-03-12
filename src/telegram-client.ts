@@ -122,7 +122,7 @@ export class TelegramService {
 
   async disconnect(): Promise<void> {
     if (this.client && this.connected) {
-      await this.client.disconnect();
+      await this.client.destroy();
       this.connected = false;
       this.client = null;
     }
