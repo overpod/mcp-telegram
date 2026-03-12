@@ -136,6 +136,7 @@ export class TelegramService {
     if (!this.client || !this.connected) return false;
     try {
       await this.client.invoke(new Api.auth.LogOut());
+      await this.client.destroy();
       this.connected = false;
       this.sessionString = "";
       this.client = null;
@@ -225,7 +226,7 @@ export class TelegramService {
 
       if (resolved) {
         const newSession = client.session.save() as unknown as string;
-        await client.disconnect();
+        await client.destroy();
         await this.saveSession(newSession);
         // Reconnect with new session
         this.sessionString = newSession;
@@ -233,11 +234,11 @@ export class TelegramService {
         return { success: true, message: "Telegram login successful" };
       }
 
-      await client.disconnect();
+      await client.destroy();
       return { success: false, message: "QR login timeout" };
     } catch (err: unknown) {
       try {
-        await client.disconnect();
+        await client.destroy();
       } catch {}
       return { success: false, message: `Login failed: ${(err as Error).message}` };
     }
