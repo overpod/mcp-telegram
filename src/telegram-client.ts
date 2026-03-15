@@ -685,4 +685,49 @@ export class TelegramService {
       lastSeen,
     };
   }
+
+  async joinChat(
+    target: string,
+  ): Promise<{ id: string; title: string; type: string }> {
+    if (!this.client) throw new Error("Not connected");
+
+    // Extract invite hash from various link formats
+    const inviteMatch = target.match(
+      /(?:t\.me\/\+|t\.me\/joinchat\/|tg:\/\/join\?invite=)([a-zA-Z0-9_-]+)/,
+    );
+
+    if (inviteMatch) {
+      const result = await this.client.invoke(
+        new Api.messages.ImportChatInvite({ hash: inviteMatch[1] }),
+      );
+      const chat = (result as Api.Updates).chats?.[0];
+      if (!chat) throw new Error("Failed to join via invite link");
+      return {
+        id: chat.id.toString(),
+        title: (chat as Api.Channel | Api.Chat).title ?? "Unknown",
+        type: chat.className === "Channel" ? "channel" : "group",
+      };
+    }
+
+    // Public channel/group by username
+    const username = target.replace(/^@/, "").replace(/^https?:\/\/t\.me\//, "");
+    const entity = await this.client.getEntity(username);
+
+    if (entity instanceof Api.Channel || entity instanceof Api.Chat) {
+      await this.client.invoke(
+        new Api.channels.JoinChannel({
+          channel: entity as Api.Channel,
+        }),
+      );
+      return {
+        id: entity.id.toString(),
+        title: entity.title ?? "Unknown",
+        type: entity.className === "Channel" ? "channel" : "group",
+      };
+    }
+
+    throw new Error(
+      "Target is not a group or channel. Use username, @username, or invite link.",
+    );
+  }
 }

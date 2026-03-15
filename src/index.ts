@@ -545,6 +545,38 @@ server.tool(
   },
 );
 
+server.tool(
+  "telegram-join-chat",
+  "Join a Telegram group or channel by username or invite link",
+  {
+    target: z
+      .string()
+      .describe(
+        "Username (@group), link (t.me/group), or invite link (t.me/+xxx)",
+      ),
+  },
+  async ({ target }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const result = await telegram.joinChat(target);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Joined ${result.type}: ${result.title} (ID: ${result.id})`,
+          },
+        ],
+      };
+    } catch (e) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+      };
+    }
+  },
+);
+
 // --- Start ---
 
 async function main() {
