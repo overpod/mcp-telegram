@@ -1,0 +1,24 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - TELEGRAM_API_ID
+      - TELEGRAM_API_HASH
+    properties:
+      TELEGRAM_API_ID:
+        type: string
+        description: Telegram API ID from my.telegram.org
+      TELEGRAM_API_HASH:
+        type: string
+        description: Telegram API Hash from my.telegram.org
+  commandFunction:
+    |-
+    (config) => ({
+      command: "npx",
+      args: ["-y", "@overpod/mcp-telegram"],
+      env: {
+        TELEGRAM_API_ID: config.TELEGRAM_API_ID,
+        TELEGRAM_API_HASH: config.TELEGRAM_API_HASH,
+      }
+    })
