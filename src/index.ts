@@ -149,7 +149,10 @@ server.tool(
   {
     limit: z.number().default(20).describe("Number of chats to return"),
     offsetDate: z.number().optional().describe("Unix timestamp offset for pagination"),
-    filterType: z.enum(["private", "group", "channel"]).optional().describe("Filter by chat type"),
+    filterType: z
+      .enum(["private", "group", "channel", "contact_requests"])
+      .optional()
+      .describe("Filter by chat type. 'contact_requests' shows only private chats from non-contacts"),
   },
   async ({ limit, offsetDate, filterType }) => {
     const err = await requireConnection();
@@ -158,10 +161,13 @@ server.tool(
     try {
       const dialogs = await telegram.getDialogs(limit, offsetDate, filterType);
       const text = dialogs
-        .map(
-          (d) =>
-            `${d.type === "group" ? "G" : d.type === "channel" ? "C" : "P"} ${d.name} (${d.id}) ${d.unreadCount > 0 ? `[${d.unreadCount} unread]` : ""}`,
-        )
+        .map((d) => {
+          const prefix = d.type === "group" ? "G" : d.type === "channel" ? "C" : "P";
+          const botTag = d.isBot ? " [bot]" : "";
+          const contactTag = d.type === "private" && d.isContact === false ? " [not in contacts]" : "";
+          const unread = d.unreadCount > 0 ? ` [${d.unreadCount} unread]` : "";
+          return `${prefix} ${d.name} (${d.id})${botTag}${contactTag}${unread}`;
+        })
         .join("\n");
       return { content: [{ type: "text", text: text || "No chats" }] };
     } catch (e) {
@@ -267,10 +273,12 @@ server.tool(
     try {
       const dialogs = await telegram.getUnreadDialogs(limit);
       const text = dialogs
-        .map(
-          (d) =>
-            `${d.type === "group" ? "G" : d.type === "channel" ? "C" : "P"} ${d.name} (${d.id}) [${d.unreadCount} unread]`,
-        )
+        .map((d) => {
+          const prefix = d.type === "group" ? "G" : d.type === "channel" ? "C" : "P";
+          const botTag = d.isBot ? " [bot]" : "";
+          const contactTag = d.type === "private" && d.isContact === false ? " [not in contacts]" : "";
+          return `${prefix} ${d.name} (${d.id})${botTag}${contactTag} [${d.unreadCount} unread]`;
+        })
         .join("\n");
       return { content: [{ type: "text", text: text || "No unread chats" }] };
     } catch (e) {
@@ -650,6 +658,99 @@ server.tool(
       return { content: [{ type: "text", text: `Poll created in ${chatId}${msgId ? ` (message #${msgId})` : ""}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Poll error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-contact-requests",
+  "Get incoming messages from non-contacts (contact requests). Shows who messaged you without being in your contacts, with message preview",
+  {
+    limit: z.number().default(20).describe("Number of contact requests to return"),
+  },
+  async ({ limit }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const requests = await telegram.getContactRequests(limit);
+      if (requests.length === 0) {
+        return { content: [{ type: "text", text: "No contact requests" }] };
+      }
+      const text = requests
+        .map((r) => {
+          const tag = r.isBot ? "[bot]" : "[user]";
+          const username = r.username ? ` @${r.username}` : "";
+          const unread = r.unreadCount > 0 ? ` [${r.unreadCount} unread]` : "";
+          const preview = r.lastMessage ? `\n  > ${r.lastMessage.slice(0, 100)}` : "";
+          return `${tag} ${r.name}${username} (${r.id})${unread}${preview}`;
+        })
+        .join("\n");
+      return { content: [{ type: "text", text: text }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-add-contact",
+  "Add a user to your Telegram contacts. Use this to accept contact requests from non-contacts",
+  {
+    userId: z.string().describe("User ID or username to add"),
+    firstName: z.string().describe("First name for the contact"),
+    lastName: z.string().optional().describe("Last name for the contact"),
+    phone: z.string().optional().describe("Phone number for the contact"),
+  },
+  async ({ userId, firstName, lastName, phone }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.addContact(userId, firstName, lastName, phone);
+      return {
+        content: [{ type: "text", text: `Contact added: ${firstName}${lastName ? ` ${lastName}` : ""} (${userId})` }],
+      };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-block-user",
+  "Block a Telegram user. Blocked users cannot send you messages",
+  {
+    userId: z.string().describe("User ID or username to block"),
+  },
+  async ({ userId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.blockUser(userId);
+      return { content: [{ type: "text", text: `User blocked: ${userId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-report-spam",
+  "Report a chat as spam to Telegram",
+  {
+    chatId: z.string().describe("Chat ID or username to report"),
+  },
+  async ({ chatId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      await telegram.reportSpam(chatId);
+      return { content: [{ type: "text", text: `Reported as spam: ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
   },
 );

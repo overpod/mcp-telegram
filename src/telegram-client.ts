@@ -322,24 +322,36 @@ export class TelegramService {
   async getDialogs(
     limit = 20,
     offsetDate?: number,
-    filterType?: "private" | "group" | "channel",
+    filterType?: "private" | "group" | "channel" | "contact_requests",
   ): Promise<
     Array<{
       id: string;
       name: string;
       type: string;
       unreadCount: number;
+      isBot?: boolean;
+      isContact?: boolean;
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
     const fetchLimit = filterType ? limit * 3 : limit;
     const dialogs = await this.client.getDialogs({ limit: fetchLimit, ...(offsetDate ? { offsetDate } : {}) });
-    const mapped = dialogs.map((d) => ({
-      id: d.id?.toString() ?? "",
-      name: d.title ?? d.name ?? "Unknown",
-      type: d.isGroup ? "group" : d.isChannel ? "channel" : "private",
-      unreadCount: d.unreadCount,
-    }));
+    const mapped = dialogs.map((d) => {
+      const type = d.isGroup ? "group" : d.isChannel ? "channel" : "private";
+      const isUser = d.entity instanceof Api.User;
+      return {
+        id: d.id?.toString() ?? "",
+        name: d.title ?? d.name ?? "Unknown",
+        type,
+        unreadCount: d.unreadCount,
+        ...(isUser
+          ? { isBot: Boolean((d.entity as Api.User).bot), isContact: Boolean((d.entity as Api.User).contact) }
+          : {}),
+      };
+    });
+    if (filterType === "contact_requests") {
+      return mapped.filter((d) => d.type === "private" && d.isContact === false).slice(0, limit);
+    }
     return filterType ? mapped.filter((d) => d.type === filterType).slice(0, limit) : mapped;
   }
 
@@ -349,6 +361,8 @@ export class TelegramService {
       name: string;
       type: string;
       unreadCount: number;
+      isBot?: boolean;
+      isContact?: boolean;
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
@@ -356,12 +370,77 @@ export class TelegramService {
     return dialogs
       .filter((d) => d.unreadCount > 0)
       .slice(0, limit)
-      .map((d) => ({
-        id: d.id?.toString() ?? "",
-        name: d.title ?? d.name ?? "Unknown",
-        type: d.isGroup ? "group" : d.isChannel ? "channel" : "private",
-        unreadCount: d.unreadCount,
-      }));
+      .map((d) => {
+        const isUser = d.entity instanceof Api.User;
+        return {
+          id: d.id?.toString() ?? "",
+          name: d.title ?? d.name ?? "Unknown",
+          type: d.isGroup ? "group" : d.isChannel ? "channel" : "private",
+          unreadCount: d.unreadCount,
+          ...(isUser
+            ? { isBot: Boolean((d.entity as Api.User).bot), isContact: Boolean((d.entity as Api.User).contact) }
+            : {}),
+        };
+      });
+  }
+
+  async getContactRequests(limit = 20): Promise<
+    Array<{
+      id: string;
+      name: string;
+      username?: string;
+      isBot: boolean;
+      unreadCount: number;
+      lastMessage?: string;
+      lastMessageDate?: number;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const dialogs = await this.client.getDialogs({ limit: limit * 5 });
+    return dialogs
+      .filter((d) => {
+        if (d.isGroup || d.isChannel) return false;
+        return d.entity instanceof Api.User && !d.entity.contact;
+      })
+      .slice(0, limit)
+      .map((d) => {
+        const user = d.entity as Api.User;
+        const msg = d.message;
+        return {
+          id: d.id?.toString() ?? "",
+          name: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unknown",
+          username: user.username ?? undefined,
+          isBot: Boolean(user.bot),
+          unreadCount: d.unreadCount,
+          lastMessage: msg?.message ?? undefined,
+          lastMessageDate: msg?.date ?? undefined,
+        };
+      });
+  }
+
+  async addContact(userId: string, firstName: string, lastName?: string, phone?: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const entity = await this.client.getInputEntity(userId);
+    await this.client.invoke(
+      new Api.contacts.AddContact({
+        id: entity,
+        firstName,
+        lastName: lastName ?? "",
+        phone: phone ?? "",
+      }),
+    );
+  }
+
+  async blockUser(userId: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const entity = await this.client.getInputEntity(userId);
+    await this.client.invoke(new Api.contacts.Block({ id: entity }));
+  }
+
+  async reportSpam(chatId: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const peer = await this.client.getInputEntity(chatId);
+    await this.client.invoke(new Api.messages.ReportSpam({ peer }));
   }
 
   async markAsRead(chatId: string): Promise<void> {
@@ -391,6 +470,8 @@ export class TelegramService {
     username?: string;
     description?: string;
     membersCount?: number;
+    isBot?: boolean;
+    isContact?: boolean;
   }> {
     if (!this.client || !this.connected) throw new Error("Not connected");
     const entity = await this.client.getEntity(chatId);
@@ -401,6 +482,8 @@ export class TelegramService {
         name: parts.join(" ") || "Unknown",
         type: "private",
         username: entity.username ?? undefined,
+        isBot: Boolean(entity.bot),
+        isContact: Boolean(entity.contact),
       };
     }
     if (entity instanceof Api.Channel) {
