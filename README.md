@@ -173,22 +173,31 @@ const telegramMcp = new MCPClient({
 
 | Tool | Description |
 |------|-------------|
-| `telegram-list-chats` | List recent dialogs with unread counts |
+| `telegram-list-chats` | List recent dialogs with unread counts, bot/contact markers |
 | `telegram-read-messages` | Read recent messages from a chat |
 | `telegram-search-chats` | Search for chats, users, or channels by name |
 | `telegram-search-messages` | Search messages in a chat by text |
-| `telegram-get-unread` | Get chats with unread messages |
+| `telegram-get-unread` | Get chats with unread messages, bot/contact markers |
+| `telegram-get-contact-requests` | Get incoming messages from non-contacts with preview |
 
 ### Chat Management
 
 | Tool | Description |
 |------|-------------|
 | `telegram-mark-as-read` | Mark a chat as read |
-| `telegram-get-chat-info` | Get detailed info about a chat (name, type, members count, description) |
+| `telegram-get-chat-info` | Get detailed info about a chat (name, type, members, bot/contact status) |
 | `telegram-get-chat-members` | List members of a group or channel |
 | `telegram-join-chat` | Join a group or channel by username or invite link |
 | `telegram-pin-message` | Pin a message in a chat |
 | `telegram-unpin-message` | Unpin a message in a chat |
+
+### Contacts & Moderation
+
+| Tool | Description |
+|------|-------------|
+| `telegram-add-contact` | Add a user to your contacts (accept contact request) |
+| `telegram-block-user` | Block a user from sending you messages |
+| `telegram-report-spam` | Report a chat as spam to Telegram |
 
 ### User Info
 
@@ -224,7 +233,7 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 |-----------|------|----------|-------------|
 | `limit` | number | no | Number of chats to return (default: 20) |
 | `offsetDate` | number | no | Unix timestamp for pagination |
-| `filterType` | `"private"` / `"group"` / `"channel"` | no | Filter by chat type |
+| `filterType` | `"private"` / `"group"` / `"channel"` / `"contact_requests"` | no | Filter by chat type |
 
 ### telegram-read-messages
 
@@ -355,6 +364,33 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `limit` | number | no | Number of unread chats (default: 20) |
+
+### telegram-get-contact-requests
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | number | no | Number of contact requests (default: 20) |
+
+### telegram-add-contact
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `userId` | string | yes | User ID or @username to add |
+| `firstName` | string | yes | First name for the contact |
+| `lastName` | string | no | Last name for the contact |
+| `phone` | string | no | Phone number for the contact |
+
+### telegram-block-user
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `userId` | string | yes | User ID or @username to block |
+
+### telegram-report-spam
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chatId` | string | yes | Chat ID or @username to report |
 
 ## Development
 
