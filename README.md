@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![mcp-telegram MCP server](https://glama.ai/mcp/servers/overpod/mcp-telegram/badges/score.svg)](https://glama.ai/mcp/servers/overpod/mcp-telegram)
 
-> **Hosted version available!** Don't want to self-host? Use [mcp-telegram.com](https://mcp-telegram.com) -- connect Telegram to Claude.ai in 30 seconds with QR code. No API keys needed.
+> **Hosted version available!** Don't want to self-host? Use [mcp-telegram.com](https://mcp-telegram.com) -- connect Telegram to Claude.ai or ChatGPT in 30 seconds with QR code. No API keys needed.
 
 <p align="center">
   <img src="assets/demo.gif" alt="MCP Telegram demo — connect and summarize chats in Claude" width="700">
@@ -24,7 +24,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
-- **Works with any MCP client** -- Claude Code, Claude Desktop, Cursor, VS Code, Mastra, etc.
+- **Works with any MCP client** -- Claude Code, Claude Desktop, ChatGPT, Cursor, VS Code, Mastra, etc.
 
 ## Prerequisites
 
