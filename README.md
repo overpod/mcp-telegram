@@ -20,7 +20,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
-- **24 tools** -- messaging, reactions, polls, scheduled messages, media, contacts, and more
+- **Full-featured** -- messaging, reactions, polls, scheduled messages, media, contacts, and more
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -372,7 +372,7 @@ npm run format     # Format code with Biome
 
 ```
 src/
-  index.ts            -- MCP server entry point, 24 tool definitions
+  index.ts            -- MCP server entry point, tool definitions
   telegram-client.ts  -- TelegramService class (GramJS wrapper)
   qr-login-cli.ts     -- CLI utility for QR code login
 ```
