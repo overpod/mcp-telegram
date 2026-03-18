@@ -456,7 +456,14 @@ export class TelegramService {
             const unreadTopics = forumTopics
               .filter((t) => t.unreadCount > 0)
               .map((t) => ({ id: t.id, title: t.title, unreadCount: t.unreadCount }));
-            return { ...base, forum: true, topics: unreadTopics.length > 0 ? unreadTopics : undefined };
+            const realUnread = unreadTopics.reduce((sum, t) => sum + t.unreadCount, 0);
+            if (realUnread === 0) return null;
+            return {
+              ...base,
+              unreadCount: realUnread,
+              forum: true,
+              topics: unreadTopics.length > 0 ? unreadTopics : undefined,
+            };
           } catch {
             return { ...base, forum: true };
           }
@@ -464,7 +471,7 @@ export class TelegramService {
         return base;
       }),
     );
-    return results;
+    return results.filter((r) => r !== null);
   }
 
   async getContactRequests(limit = 20): Promise<

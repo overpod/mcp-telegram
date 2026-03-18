@@ -21,6 +21,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **MTProto protocol** -- direct Telegram API access, not the limited Bot API
 - **Userbot** -- operates as your personal account, not a bot
 - **Full-featured** -- messaging, reactions, polls, scheduled messages, media, contacts, and more
+- **Forum Topics** -- list topics, read per-topic messages, send to specific topics, per-topic unread counts
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
