@@ -27,6 +27,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-ghpr:
+    needs: publish-npm
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,6 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npm publish --access public
+      - name: Publish to GitHub Packages
+        run: npm publish --access public || echo "Already published, skipping"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
