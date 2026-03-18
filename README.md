@@ -46,7 +46,9 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 TELEGRAM_API_ID=YOUR_ID TELEGRAM_API_HASH=YOUR_HASH npx @overpod/mcp-telegram login
 ```
 
-A QR code will appear in the terminal. Open Telegram on your phone, go to **Settings > Devices > Link Desktop Device**, and scan the code. The session is saved to `~/.telegram-session` and reused automatically.
+A QR code will appear in the terminal. Open Telegram on your phone, go to **Settings > Devices > Link Desktop Device**, and scan the code. The session is saved to `~/.mcp-telegram/session` and reused automatically.
+
+> **Custom session path:** set `TELEGRAM_SESSION_PATH=/path/to/session` to store the session file elsewhere.
 
 ### 3. Add to Claude
 
@@ -426,7 +428,8 @@ src/
 ## Security
 
 - API credentials are stored in `.env` (gitignored)
-- Session is stored in `.telegram-session` (gitignored)
+- Session is stored in `~/.mcp-telegram/session` with `0600` permissions (owner-only access)
+- Session directory is created with `0700` permissions
 - Phone number is **not required** -- QR-only authentication
 - This is a **userbot** (personal account), not a bot -- respect the [Telegram Terms of Service](https://core.telegram.org/api/terms)
 
