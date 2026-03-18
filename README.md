@@ -207,8 +207,15 @@ const telegramMcp = new MCPClient({
 | `telegram-read-messages` | Read recent messages from a chat |
 | `telegram-search-chats` | Search for chats, users, or channels by name |
 | `telegram-search-messages` | Search messages in a chat by text |
-| `telegram-get-unread` | Get chats with unread messages, bot/contact markers |
+| `telegram-get-unread` | Get chats with unread messages; forums show per-topic unread breakdown |
 | `telegram-get-contact-requests` | Get incoming messages from non-contacts with preview |
+
+### Forum Topics
+
+| Tool | Description |
+|------|-------------|
+| `telegram-list-topics` | List forum topics in a group with unread counts and status |
+| `telegram-read-topic-messages` | Read messages from a specific forum topic |
 
 ### Chat Management
 
@@ -256,6 +263,23 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 | `text` | string | yes | Message text |
 | `replyTo` | number | no | Message ID to reply to |
 | `parseMode` | `"md"` / `"html"` | no | Message formatting mode |
+| `topicId` | number | no | Forum topic ID to send into (for groups with Topics) |
+
+### telegram-list-topics
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chatId` | string | yes | Chat ID or @username (group with Topics enabled) |
+| `limit` | number | no | Max topics to return (default: 100) |
+
+### telegram-read-topic-messages
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chatId` | string | yes | Chat ID or @username |
+| `topicId` | number | yes | Topic ID (from `telegram-list-topics`) |
+| `limit` | number | no | Number of messages (default: 20) |
+| `offsetId` | number | no | Message ID for pagination |
 
 ### telegram-list-chats
 

@@ -129,14 +129,16 @@ server.tool(
     text: z.string().describe("Message text"),
     replyTo: z.number().optional().describe("Message ID to reply to"),
     parseMode: z.enum(["md", "html"]).optional().describe("Message format: md (Markdown) or html"),
+    topicId: z.number().optional().describe("Forum topic ID to send message into (for groups with Topics enabled)"),
   },
-  async ({ chatId, text, replyTo, parseMode }) => {
+  async ({ chatId, text, replyTo, parseMode, topicId }) => {
     const err = await requireConnection();
     if (err) return { content: [{ type: "text", text: err }] };
 
     try {
-      await telegram.sendMessage(chatId, text, replyTo, parseMode);
-      return { content: [{ type: "text", text: `Message sent to ${chatId}` }] };
+      await telegram.sendMessage(chatId, text, replyTo, parseMode, topicId);
+      const dest = topicId ? `topic ${topicId} in ${chatId}` : chatId;
+      return { content: [{ type: "text", text: `Message sent to ${dest}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Send error: ${(e as Error).message}` }] };
     }
@@ -277,7 +279,13 @@ server.tool(
           const prefix = d.type === "group" ? "G" : d.type === "channel" ? "C" : "P";
           const botTag = d.isBot ? " [bot]" : "";
           const contactTag = d.type === "private" && d.isContact === false ? " [not in contacts]" : "";
-          return `${prefix} ${d.name} (${d.id})${botTag}${contactTag} [${d.unreadCount} unread]`;
+          const forumTag = d.forum ? " [forum]" : "";
+          let line = `${prefix} ${d.name} (${d.id})${botTag}${contactTag}${forumTag} [${d.unreadCount} unread]`;
+          if (d.topics && d.topics.length > 0) {
+            const topicLines = d.topics.map((t) => `  # ${t.title} [${t.unreadCount} unread]`);
+            line += `\n${topicLines.join("\n")}`;
+          }
+          return line;
         })
         .join("\n");
       return { content: [{ type: "text", text: text || "No unread chats" }] };
@@ -388,6 +396,7 @@ server.tool(
         `Name: ${info.name}`,
         `ID: ${info.id}`,
         `Type: ${info.type}`,
+        ...(info.forum ? ["Forum: yes"] : []),
         ...(info.username ? [`Username: @${info.username}`] : []),
         ...(info.description ? [`Description: ${info.description}`] : []),
         ...(info.membersCount != null ? [`Members: ${info.membersCount}`] : []),
@@ -749,6 +758,62 @@ server.tool(
     try {
       await telegram.reportSpam(chatId);
       return { content: [{ type: "text", text: `Reported as spam: ${chatId}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-list-topics",
+  "List forum topics in a Telegram group with Topics enabled. Shows topic names, unread counts, and status",
+  {
+    chatId: z.string().describe("Chat ID or username of a group with Topics enabled"),
+    limit: z.number().default(100).describe("Max topics to return"),
+  },
+  async ({ chatId, limit }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const topics = await telegram.getForumTopics(chatId, limit);
+      const text = topics
+        .map((t) => {
+          const flags = [t.pinned ? "pinned" : "", t.closed ? "closed" : ""].filter(Boolean).join(", ");
+          const flagStr = flags ? ` [${flags}]` : "";
+          const unread = t.unreadCount > 0 ? ` [${t.unreadCount} unread]` : "";
+          return `# ${t.title} (id: ${t.id})${flagStr}${unread}`;
+        })
+        .join("\n");
+      return { content: [{ type: "text", text: text || "No topics found" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-read-topic-messages",
+  "Read messages from a specific forum topic in a Telegram group",
+  {
+    chatId: z.string().describe("Chat ID or username"),
+    topicId: z.number().describe("Topic ID (get from telegram-list-topics)"),
+    limit: z.number().default(20).describe("Number of messages to return"),
+    offsetId: z.number().optional().describe("Message ID to start from (for pagination)"),
+  },
+  async ({ chatId, topicId, limit, offsetId }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const messages = await telegram.getTopicMessages(chatId, topicId, limit, offsetId);
+      const text = messages
+        .map(
+          (m) =>
+            `[${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+        )
+        .join("\n\n");
+      return { content: [{ type: "text", text: text || "No messages in this topic" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }

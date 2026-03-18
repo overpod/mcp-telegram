@@ -301,13 +301,35 @@ export class TelegramService {
     };
   }
 
-  async sendMessage(chatId: string, text: string, replyTo?: number, parseMode?: "md" | "html"): Promise<void> {
+  async sendMessage(
+    chatId: string,
+    text: string,
+    replyTo?: number,
+    parseMode?: "md" | "html",
+    topicId?: number,
+  ): Promise<void> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    await this.client.sendMessage(chatId, {
-      message: text,
-      ...(replyTo ? { replyTo } : {}),
-      ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
-    });
+    if (topicId) {
+      // Forum topics require raw API call with InputReplyToMessage
+      const peer = await this.client.getInputEntity(chatId);
+      await this.client.invoke(
+        new Api.messages.SendMessage({
+          peer,
+          message: text,
+          randomId: bigInt(Math.floor(Math.random() * 1e15)),
+          replyTo: new Api.InputReplyToMessage({
+            replyToMsgId: replyTo ?? topicId,
+            topMsgId: topicId,
+          }),
+        }),
+      );
+    } else {
+      await this.client.sendMessage(chatId, {
+        message: text,
+        ...(replyTo ? { replyTo } : {}),
+        ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
+      });
+    }
   }
 
   async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
@@ -408,16 +430,18 @@ export class TelegramService {
       unreadCount: number;
       isBot?: boolean;
       isContact?: boolean;
+      forum?: boolean;
+      topics?: Array<{ id: number; title: string; unreadCount: number }>;
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
     const dialogs = await this.client.getDialogs({ limit: limit * 3 });
-    return dialogs
-      .filter((d) => d.unreadCount > 0)
-      .slice(0, limit)
-      .map((d) => {
+    const unread = dialogs.filter((d) => d.unreadCount > 0).slice(0, limit);
+    const results = await Promise.all(
+      unread.map(async (d) => {
         const isUser = d.entity instanceof Api.User;
-        return {
+        const isForum = d.entity instanceof Api.Channel && Boolean(d.entity.forum);
+        const base = {
           id: d.id?.toString() ?? "",
           name: d.title ?? d.name ?? "Unknown",
           type: d.isGroup ? "group" : d.isChannel ? "channel" : "private",
@@ -426,7 +450,21 @@ export class TelegramService {
             ? { isBot: Boolean((d.entity as Api.User).bot), isContact: Boolean((d.entity as Api.User).contact) }
             : {}),
         };
-      });
+        if (isForum) {
+          try {
+            const forumTopics = await this.getForumTopics(d.id?.toString() ?? "");
+            const unreadTopics = forumTopics
+              .filter((t) => t.unreadCount > 0)
+              .map((t) => ({ id: t.id, title: t.title, unreadCount: t.unreadCount }));
+            return { ...base, forum: true, topics: unreadTopics.length > 0 ? unreadTopics : undefined };
+          } catch {
+            return { ...base, forum: true };
+          }
+        }
+        return base;
+      }),
+    );
+    return results;
   }
 
   async getContactRequests(limit = 20): Promise<
@@ -517,6 +555,7 @@ export class TelegramService {
     membersCount?: number;
     isBot?: boolean;
     isContact?: boolean;
+    forum?: boolean;
   }> {
     if (!this.client || !this.connected) throw new Error("Not connected");
     const entity = await this.client.getEntity(chatId);
@@ -550,6 +589,7 @@ export class TelegramService {
         username: entity.username ?? undefined,
         description,
         membersCount,
+        forum: Boolean(entity.forum) || undefined,
       };
     }
     if (entity instanceof Api.Chat) {
@@ -887,6 +927,113 @@ export class TelegramService {
       }
     }
     return 0;
+  }
+
+  async getForumTopics(
+    chatId: string,
+    limit = 100,
+  ): Promise<
+    Array<{
+      id: number;
+      title: string;
+      unreadCount: number;
+      unreadMentions: number;
+      iconColor: number;
+      closed: boolean;
+      pinned: boolean;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const entity = await this.client.getEntity(chatId);
+    if (!(entity instanceof Api.Channel)) throw new Error("Forum topics are only available in supergroups");
+    const result = await this.client.invoke(
+      new Api.channels.GetForumTopics({
+        channel: entity,
+        limit,
+        offsetTopic: 0,
+        offsetDate: 0,
+        offsetId: 0,
+      }),
+    );
+    const topics: Array<{
+      id: number;
+      title: string;
+      unreadCount: number;
+      unreadMentions: number;
+      iconColor: number;
+      closed: boolean;
+      pinned: boolean;
+    }> = [];
+    for (const topic of result.topics) {
+      if (topic instanceof Api.ForumTopic) {
+        topics.push({
+          id: topic.id,
+          title: topic.title,
+          unreadCount: topic.unreadCount,
+          unreadMentions: topic.unreadMentionsCount,
+          iconColor: topic.iconColor,
+          closed: Boolean(topic.closed),
+          pinned: Boolean(topic.pinned),
+        });
+      }
+    }
+    return topics;
+  }
+
+  async getTopicMessages(
+    chatId: string,
+    topicId: number,
+    limit = 20,
+    offsetId?: number,
+  ): Promise<
+    Array<{
+      id: number;
+      text: string;
+      sender: string;
+      date: string;
+      media?: { type: string; fileName?: string; size?: number };
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const peer = await this.client.getInputEntity(chatId);
+    const result = await this.client.invoke(
+      new Api.messages.GetReplies({
+        peer,
+        msgId: topicId,
+        limit,
+        ...(offsetId ? { offsetId } : {}),
+        offsetDate: 0,
+        addOffset: 0,
+        maxId: 0,
+        minId: 0,
+        hash: bigInt(0),
+      }),
+    );
+    const messages = "messages" in result ? result.messages : [];
+    const results = await Promise.all(
+      messages
+        .filter((m): m is Api.Message => m instanceof Api.Message)
+        .map(async (m) => ({
+          id: m.id,
+          text: m.message ?? "",
+          sender: await this.resolveSenderName(m.senderId),
+          date: new Date((m.date ?? 0) * 1000).toISOString(),
+          media: this.extractMediaInfo(m.media),
+        })),
+    );
+    return results;
+  }
+
+  /** Check if a chat entity is a forum (has topics enabled) */
+  async isForum(chatId: string): Promise<boolean> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    try {
+      const entity = await this.client.getEntity(chatId);
+      if (entity instanceof Api.Channel) {
+        return Boolean(entity.forum);
+      }
+    } catch {}
+    return false;
   }
 
   async joinChat(target: string): Promise<{ id: string; title: string; type: string }> {
