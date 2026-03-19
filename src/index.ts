@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+
+// Redirect console.log to stderr BEFORE any imports.
+// GramJS Logger uses console.log (stdout) which corrupts MCP JSON-RPC stream.
+const _origLog = console.log;
+console.log = (...args: unknown[]) => {
+  console.error(...args);
+};
+
 import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
