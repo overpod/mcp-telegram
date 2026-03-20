@@ -231,10 +231,38 @@ server.tool(
       const text = results
         .map(
           (c) =>
-            `${c.type === "group" ? "G" : c.type === "channel" ? "C" : "P"} ${c.name}${c.username ? ` (@${c.username})` : ""} (${c.id})`,
+            `${c.type === "group" ? "G" : c.type === "channel" ? "C" : "P"} ${c.name}${c.username ? ` (@${c.username})` : ""} (${c.id})${c.membersCount ? ` [${c.membersCount} members]` : ""}${c.description ? ` — ${c.description.split("\n")[0].slice(0, 100)}` : ""}`,
         )
         .join("\n");
       return { content: [{ type: "text", text: text || "No results" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-search-global",
+  "Search messages globally across all public Telegram chats and channels",
+  {
+    query: z.string().describe("Search text"),
+    limit: z.number().default(20).describe("Max results"),
+    minDate: z.number().optional().describe("Unix timestamp: only messages after this date"),
+    maxDate: z.number().optional().describe("Unix timestamp: only messages before this date"),
+  },
+  async ({ query, limit, minDate, maxDate }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const messages = await telegram.searchGlobal(query, limit, minDate, maxDate);
+      const text = messages
+        .map(
+          (m) =>
+            `[${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+        )
+        .join("\n\n");
+      return { content: [{ type: "text", text: text || "No messages found" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }

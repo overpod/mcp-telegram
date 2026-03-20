@@ -713,11 +713,20 @@ export class TelegramService {
       name: string;
       type: string;
       username?: string;
+      membersCount?: number;
+      description?: string;
     }>
   > {
     if (!this.client || !this.connected) throw new Error("Not connected");
     const result = await this.client.invoke(new Api.contacts.Search({ q: query, limit }));
-    const chats: Array<{ id: string; name: string; type: string; username?: string }> = [];
+    const chats: Array<{
+      id: string;
+      name: string;
+      type: string;
+      username?: string;
+      membersCount?: number;
+      description?: string;
+    }> = [];
     for (const user of result.users) {
       if (user instanceof Api.User) {
         const parts = [user.firstName, user.lastName].filter(Boolean);
@@ -731,17 +740,131 @@ export class TelegramService {
     }
     for (const chat of result.chats) {
       if (chat instanceof Api.Chat) {
-        chats.push({ id: chat.id.toString(), name: chat.title, type: "group" });
+        chats.push({
+          id: chat.id.toString(),
+          name: chat.title,
+          type: "group",
+          membersCount: chat.participantsCount ?? undefined,
+        });
       } else if (chat instanceof Api.Channel) {
         chats.push({
           id: chat.id.toString(),
           name: chat.title,
           type: chat.megagroup ? "group" : "channel",
           username: chat.username ?? undefined,
+          membersCount: chat.participantsCount ?? undefined,
         });
       }
     }
+
+    // Enrich channels/groups with description and accurate members count
+    for (const chat of chats) {
+      if (chat.type === "private") continue;
+      try {
+        const entity = await this.client.getEntity(chat.id);
+        if (entity instanceof Api.Channel) {
+          const full = await this.client.invoke(new Api.channels.GetFullChannel({ channel: entity }));
+          if (full.fullChat instanceof Api.ChannelFull) {
+            chat.description = full.fullChat.about || undefined;
+            chat.membersCount = full.fullChat.participantsCount ?? chat.membersCount;
+          }
+        } else if (entity instanceof Api.Chat) {
+          const full = await this.client.invoke(new Api.messages.GetFullChat({ chatId: entity.id }));
+          if (full.fullChat instanceof Api.ChatFull) {
+            chat.description = full.fullChat.about || undefined;
+          }
+        }
+      } catch {
+        // Skip enrichment on error (private channels, etc.)
+      }
+    }
+
     return chats;
+  }
+
+  async searchGlobal(
+    query: string,
+    limit = 20,
+    minDate?: number,
+    maxDate?: number,
+  ): Promise<
+    Array<{
+      id: number;
+      text: string;
+      sender: string;
+      date: string;
+      chat: { id: string; name: string; type: string; username?: string };
+      media?: { type: string; fileName?: string; size?: number };
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const result = await this.client.invoke(
+      new Api.messages.SearchGlobal({
+        q: query,
+        filter: new Api.InputMessagesFilterEmpty(),
+        minDate: minDate || 0,
+        maxDate: maxDate || 0,
+        offsetRate: 0,
+        offsetPeer: new Api.InputPeerEmpty(),
+        offsetId: 0,
+        limit,
+      }),
+    );
+
+    const chatsMap = new Map<string, { id: string; name: string; type: string; username?: string }>();
+    if ("chats" in result) {
+      for (const chat of result.chats) {
+        if (chat instanceof Api.Channel) {
+          chatsMap.set(chat.id.toString(), {
+            id: chat.id.toString(),
+            name: chat.title,
+            type: chat.megagroup ? "group" : "channel",
+            username: chat.username ?? undefined,
+          });
+        } else if (chat instanceof Api.Chat) {
+          chatsMap.set(chat.id.toString(), {
+            id: chat.id.toString(),
+            name: chat.title,
+            type: "group",
+          });
+        }
+      }
+    }
+    if ("users" in result) {
+      for (const user of result.users) {
+        if (user instanceof Api.User) {
+          const parts = [user.firstName, user.lastName].filter(Boolean);
+          chatsMap.set(user.id.toString(), {
+            id: user.id.toString(),
+            name: parts.join(" ") || "Unknown",
+            type: "private",
+            username: user.username ?? undefined,
+          });
+        }
+      }
+    }
+
+    const rawMessages = "messages" in result ? result.messages : [];
+    const messages = rawMessages.filter((m): m is Api.Message => m instanceof Api.Message);
+    const results = await Promise.all(
+      messages.map(async (m) => {
+        const peerId = m.peerId;
+        let chatId = "";
+        if (peerId instanceof Api.PeerChannel) chatId = peerId.channelId.toString();
+        else if (peerId instanceof Api.PeerChat) chatId = peerId.chatId.toString();
+        else if (peerId instanceof Api.PeerUser) chatId = peerId.userId.toString();
+
+        return {
+          id: m.id,
+          text: m.message ?? "",
+          sender: await this.resolveSenderName(m.senderId),
+          date: new Date((m.date ?? 0) * 1000).toISOString(),
+          chat: chatsMap.get(chatId) || { id: chatId, name: "Unknown", type: "unknown" },
+          media: this.extractMediaInfo(m.media),
+        };
+      }),
+    );
+    return results;
   }
 
   async searchMessages(
