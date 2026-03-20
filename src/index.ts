@@ -572,7 +572,7 @@ server.tool(
 
 server.tool(
   "telegram-get-profile",
-  "Get detailed profile info of a Telegram user",
+  "Get detailed profile info of a Telegram user including bio, birthday, business info and more",
   {
     userId: z.string().describe("User ID or username"),
   },
@@ -589,9 +589,56 @@ server.tool(
         ...(profile.phone ? [`Phone: +${profile.phone}`] : []),
         ...(profile.bio ? [`Bio: ${profile.bio}`] : []),
         `Photo: ${profile.photo ? "yes" : "no"}`,
+        ...(profile.premium ? ["Premium: yes"] : []),
         ...(profile.lastSeen ? [`Last seen: ${profile.lastSeen}`] : []),
+        ...(profile.birthday ? [`Birthday: ${profile.birthday}`] : []),
+        ...(profile.commonChatsCount ? [`Common chats: ${profile.commonChatsCount}`] : []),
+        ...(profile.personalChannelId ? [`Personal channel ID: ${profile.personalChannelId}`] : []),
+        ...(profile.businessLocation ? [`Business location: ${profile.businessLocation}`] : []),
+        ...(profile.businessWorkHours ? [`Business hours timezone: ${profile.businessWorkHours}`] : []),
       ];
       return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
+    }
+  },
+);
+
+server.tool(
+  "telegram-get-profile-photo",
+  "Download profile photo of a Telegram user, group, or channel. Returns inline image or saves to file",
+  {
+    entityId: z.string().describe("User/Chat/Channel ID or username"),
+    savePath: z.string().optional().describe("Absolute path to save file. If omitted, returns inline base64 image"),
+    size: z
+      .enum(["small", "big"])
+      .optional()
+      .describe("Photo size: 'small' (160x160) or 'big' (640x640). Default: big"),
+  },
+  async ({ entityId, savePath, size }) => {
+    const err = await requireConnection();
+    if (err) return { content: [{ type: "text", text: err }] };
+
+    try {
+      const result = await telegram.downloadProfilePhoto(entityId, {
+        isBig: size !== "small",
+        savePath,
+      });
+
+      if (!result) {
+        return { content: [{ type: "text", text: "No profile photo found" }] };
+      }
+
+      if ("filePath" in result) {
+        return { content: [{ type: "text", text: `Downloaded to: ${result.filePath}` }] };
+      }
+
+      return {
+        content: [
+          { type: "image", data: result.buffer.toString("base64"), mimeType: result.mimeType },
+          { type: "text", text: `Profile photo (${(result.buffer.length / 1024).toFixed(0)} KB, ${result.mimeType})` },
+        ],
+      };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }

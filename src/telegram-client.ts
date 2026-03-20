@@ -948,6 +948,12 @@ export class TelegramService {
     bio?: string;
     photo: boolean;
     lastSeen?: string;
+    premium?: boolean;
+    birthday?: string;
+    commonChatsCount?: number;
+    personalChannelId?: string;
+    businessWorkHours?: string;
+    businessLocation?: string;
   }> {
     if (!this.client || !this.connected) throw new Error("Not connected");
     const entity = await this.client.getEntity(userId);
@@ -957,7 +963,8 @@ export class TelegramService {
     const fullResult = await this.client.invoke(
       new Api.users.GetFullUser({ id: inputEntity as unknown as Api.TypeInputUser }),
     );
-    const bio = fullResult.fullUser.about ?? undefined;
+    const full = fullResult.fullUser;
+    const bio = full.about ?? undefined;
 
     const parts = [entity.firstName, entity.lastName].filter(Boolean);
     let lastSeen: string | undefined;
@@ -973,6 +980,26 @@ export class TelegramService {
       lastSeen = "last month";
     }
 
+    let birthday: string | undefined;
+    if (full.birthday) {
+      const b = full.birthday as { day: number; month: number; year?: number };
+      birthday = b.year
+        ? `${b.year}-${String(b.month).padStart(2, "0")}-${String(b.day).padStart(2, "0")}`
+        : `${String(b.month).padStart(2, "0")}-${String(b.day).padStart(2, "0")}`;
+    }
+
+    let businessWorkHours: string | undefined;
+    if (full.businessWorkHours) {
+      const wh = full.businessWorkHours as { timezoneId?: string };
+      businessWorkHours = wh.timezoneId ?? "configured";
+    }
+
+    let businessLocation: string | undefined;
+    if (full.businessLocation) {
+      const loc = full.businessLocation as { address?: string };
+      businessLocation = loc.address ?? "configured";
+    }
+
     return {
       id: entity.id.toString(),
       name: parts.join(" ") || "Unknown",
@@ -981,7 +1008,45 @@ export class TelegramService {
       bio,
       photo: !!entity.photo,
       lastSeen,
+      premium: entity.premium || undefined,
+      birthday,
+      commonChatsCount: full.commonChatsCount || undefined,
+      personalChannelId: full.personalChannelId ? full.personalChannelId.toString() : undefined,
+      businessWorkHours,
+      businessLocation,
     };
+  }
+
+  async downloadProfilePhoto(
+    entityId: string,
+    options?: { isBig?: boolean; savePath?: string },
+  ): Promise<{ buffer: Buffer; mimeType: string } | { filePath: string } | null> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const entity = await this.client.getEntity(entityId);
+
+    const buffer = (await this.client.downloadProfilePhoto(entity, {
+      isBig: options?.isBig !== false,
+    })) as Buffer | undefined;
+
+    if (!buffer || buffer.length === 0) return null;
+
+    const mimeType = this.detectMimeFromBuffer(buffer);
+
+    if (options?.savePath) {
+      await writeFile(options.savePath, buffer);
+      return { filePath: options.savePath };
+    }
+
+    return { buffer, mimeType };
+  }
+
+  /** Detect MIME type from buffer magic bytes */
+  private detectMimeFromBuffer(buffer: Buffer): string {
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return "image/gif";
+    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) return "image/webp";
+    return "image/jpeg"; // Telegram profile photos are almost always JPEG
   }
 
   async sendReaction(chatId: string, messageId: number, emoji?: string): Promise<void> {
