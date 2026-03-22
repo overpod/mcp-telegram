@@ -205,7 +205,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages" }] };
@@ -259,7 +259,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages found" }] };
@@ -288,7 +288,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages found" }] };
@@ -893,7 +893,7 @@ server.tool(
       const text = messages
         .map(
           (m) =>
-            `[${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
+            `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}`,
         )
         .join("\n\n");
       return { content: [{ type: "text", text: text || "No messages in this topic" }] };
