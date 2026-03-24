@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@overpod/mcp-telegram)](https://www.npmjs.com/package/@overpod/mcp-telegram)
 [![npm downloads](https://img.shields.io/npm/dm/@overpod/mcp-telegram)](https://www.npmjs.com/package/@overpod/mcp-telegram)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![MCP SDK](https://img.shields.io/badge/MCP%20SDK-1.27-green.svg)](https://modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![mcp-telegram MCP server](https://glama.ai/mcp/servers/overpod/mcp-telegram/badges/score.svg)](https://glama.ai/mcp/servers/overpod/mcp-telegram)
@@ -208,6 +208,7 @@ const telegramMcp = new MCPClient({
 | `telegram-read-messages` | Read recent messages from a chat |
 | `telegram-search-chats` | Search for chats, users, or channels by name |
 | `telegram-search-messages` | Search messages in a chat by text |
+| `telegram-search-global` | Search messages across all public chats and channels |
 | `telegram-get-unread` | Get chats with unread messages; forums show per-topic unread breakdown |
 | `telegram-get-contact-requests` | Get incoming messages from non-contacts with preview |
 
@@ -243,6 +244,8 @@ const telegramMcp = new MCPClient({
 |------|-------------|
 | `telegram-get-contacts` | Get your contacts list with phone numbers |
 | `telegram-get-profile` | Get detailed profile info for a user (bio, photo, last seen) |
+| `telegram-get-profile-photo` | Get a user's or chat's profile photo (inline or file) |
+| `telegram-get-reactions` | Get reactions on a specific message with user details |
 
 ### Media
 
@@ -357,7 +360,8 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 |-----------|------|----------|-------------|
 | `chatId` | string | yes | Chat ID or @username |
 | `messageId` | number | yes | Message ID to react to |
-| `emoji` | string | no | Reaction emoji (e.g. 👍❤️🔥😂🎉). Omit to remove reaction |
+| `emoji` | string \| string[] | no | Single emoji `"👍"` or array `["👍","🔥"]`. Omit to remove all reactions |
+| `addToExisting` | boolean | no | Add to existing reactions instead of replacing (default: false) |
 
 ### telegram-send-scheduled
 
@@ -388,6 +392,15 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 | `query` | string | yes | Search text |
 | `limit` | number | no | Max results (default: 20) |
 
+### telegram-search-global
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | yes | Search text |
+| `limit` | number | no | Max results (default: 20) |
+| `minDate` | number | no | Unix timestamp: only messages after this date |
+| `maxDate` | number | no | Unix timestamp: only messages before this date |
+
 ### telegram-search-chats
 
 | Parameter | Type | Required | Description |
@@ -413,6 +426,21 @@ Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-10012345
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `userId` | string | yes | User ID or @username |
+
+### telegram-get-profile-photo
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `entityId` | string | yes | User/Chat/Channel ID or username |
+| `savePath` | string | no | Absolute path to save file. If omitted, returns inline base64 image |
+| `size` | `"small"` / `"big"` | no | Photo size: small (160x160) or big (640x640). Default: big |
+
+### telegram-get-reactions
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chatId` | string | yes | Chat ID or @username |
+| `messageId` | number | yes | Message ID to get reactions for |
 
 ### telegram-get-unread
 
