@@ -24,6 +24,11 @@ if (!API_ID || !API_HASH) {
 
 const telegram = new TelegramService(API_ID, API_HASH);
 
+/** Remove unpaired UTF-16 surrogates that break JSON serialization */
+function sanitize(text: string): string {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
+}
+
 /** Format reactions array into compact text like: [👍×5 ❤️×3(me) 🔥×1] */
 function formatReactions(reactions?: { emoji: string; count: number; me: boolean }[]): string {
   if (!reactions?.length) return "";
@@ -186,7 +191,7 @@ server.tool(
           return `${prefix} ${d.name} (${d.id})${botTag}${contactTag}${unread}`;
         })
         .join("\n");
-      return { content: [{ type: "text", text: text || "No chats" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No chats" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -215,7 +220,7 @@ server.tool(
             `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
-      return { content: [{ type: "text", text: text || "No messages" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No messages" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -241,7 +246,7 @@ server.tool(
             `${c.type === "group" ? "G" : c.type === "channel" ? "C" : "P"} ${c.name}${c.username ? ` (@${c.username})` : ""} (${c.id})${c.membersCount ? ` [${c.membersCount} members]` : ""}${c.description ? ` — ${c.description.split("\n")[0].slice(0, 100)}` : ""}`,
         )
         .join("\n");
-      return { content: [{ type: "text", text: text || "No results" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No results" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -269,7 +274,7 @@ server.tool(
             `[#${m.id}] [${m.date}] [${m.chat.type === "channel" ? "C" : m.chat.type === "group" ? "G" : "P"} ${m.chat.name}${m.chat.username ? ` @${m.chat.username}` : ""}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
-      return { content: [{ type: "text", text: text || "No messages found" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No messages found" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -298,7 +303,7 @@ server.tool(
             `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
-      return { content: [{ type: "text", text: text || "No messages found" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No messages found" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -331,7 +336,7 @@ server.tool(
           return line;
         })
         .join("\n");
-      return { content: [{ type: "text", text: text || "No unread chats" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No unread chats" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -549,7 +554,7 @@ server.tool(
       const text = contacts
         .map((c) => `P ${c.name}${c.username ? ` (@${c.username})` : ""} (${c.id})${c.phone ? ` +${c.phone}` : ""}`)
         .join("\n");
-      return { content: [{ type: "text", text: text || "No contacts" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No contacts" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -570,7 +575,7 @@ server.tool(
     try {
       const members = await telegram.getChatMembers(chatId, limit);
       const text = members.map((m) => `${m.name}${m.username ? ` (@${m.username})` : ""} (${m.id})`).join("\n");
-      return { content: [{ type: "text", text: text || "No members found" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No members found" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -824,7 +829,7 @@ server.tool(
           return `${tag} ${r.name}${username} (${r.id})${unread}${preview}`;
         })
         .join("\n");
-      return { content: [{ type: "text", text: text }] };
+      return { content: [{ type: "text", text: sanitize(text) }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -914,7 +919,7 @@ server.tool(
           return `# ${t.title} (id: ${t.id})${flagStr}${unread}`;
         })
         .join("\n");
-      return { content: [{ type: "text", text: text || "No topics found" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No topics found" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
@@ -942,7 +947,7 @@ server.tool(
             `[#${m.id}] [${m.date}] ${m.sender}: ${m.text}${m.media ? ` [${m.media.type}${m.media.fileName ? `: ${m.media.fileName}` : ""}]` : ""}${formatReactions(m.reactions)}`,
         )
         .join("\n\n");
-      return { content: [{ type: "text", text: text || "No messages in this topic" }] };
+      return { content: [{ type: "text", text: sanitize(text) || "No messages in this topic" }] };
     } catch (e) {
       return { content: [{ type: "text", text: `Error: ${(e as Error).message}` }] };
     }
