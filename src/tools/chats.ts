@@ -176,4 +176,194 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
       }
     },
   );
+
+  server.registerTool(
+    "telegram-leave-group",
+    {
+      description: "Leave a Telegram group or channel",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.leaveGroup(chatId);
+        return ok(`Left chat ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-invite-to-group",
+    {
+      description: "Invite users to a Telegram group or channel",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        users: z.array(z.string()).describe("Usernames or IDs to invite"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, users }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const result = await telegram.inviteToGroup(chatId, users);
+        const lines = [];
+        if (result.invited.length > 0) lines.push(`Invited: ${result.invited.join(", ")}`);
+        if (result.failed.length > 0) lines.push(`Failed: ${result.failed.join(", ")}`);
+        return ok(lines.join("\n") || "No users processed");
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-kick-user",
+    {
+      description: "Kick a user from a Telegram group (removes without permanent ban)",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        userId: z.string().describe("User ID or username to kick"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, userId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.kickUser(chatId, userId);
+        return ok(`Kicked ${userId} from ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-ban-user",
+    {
+      description: "Ban a user from a supergroup or channel (permanent until unbanned)",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        userId: z.string().describe("User ID or username to ban"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, userId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.banUser(chatId, userId);
+        return ok(`Banned ${userId} from ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-unban-user",
+    {
+      description: "Unban a previously banned user from a supergroup or channel",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        userId: z.string().describe("User ID or username to unban"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, userId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.unbanUser(chatId, userId);
+        return ok(`Unbanned ${userId} in ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-edit-group",
+    {
+      description: "Edit a group's title, description, or photo",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        title: z.string().optional().describe("New group title"),
+        description: z.string().optional().describe("New group description (supergroups only)"),
+        photoPath: z.string().optional().describe("Absolute path to new group photo image file"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, title, description, photoPath }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.editGroup(chatId, { title, description, photoPath });
+        const changed = [title && "title", description != null && "description", photoPath && "photo"].filter(Boolean);
+        return ok(`Updated ${changed.join(", ")} for ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-set-admin",
+    {
+      description: "Promote a user to admin in a supergroup or channel with full permissions",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        userId: z.string().describe("User ID or username to promote"),
+        title: z.string().optional().describe("Custom admin title"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, userId, title }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.setAdmin(chatId, userId, { title });
+        return ok(`Promoted ${userId} to admin in ${chatId}${title ? ` (${title})` : ""}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-remove-admin",
+    {
+      description: "Remove admin rights from a user in a supergroup or channel",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+        userId: z.string().describe("User ID or username to demote"),
+      },
+      annotations: WRITE,
+    },
+    async ({ chatId, userId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        await telegram.removeAdmin(chatId, userId);
+        return ok(`Removed admin rights from ${userId} in ${chatId}`);
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
 }

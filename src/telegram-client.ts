@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import bigInt from "big-integer";
 import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
+import { CustomFile } from "telegram/client/uploads.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
@@ -1526,5 +1527,207 @@ export class TelegramService {
     if (!chat) throw new Error("Failed to create group");
 
     return { id: chat.id.toString(), title, type: "group" };
+  }
+
+  async inviteToGroup(chatId: string, users: string[]): Promise<{ invited: string[]; failed: string[] }> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+    const invited: string[] = [];
+    const failed: string[] = [];
+
+    for (const u of users) {
+      try {
+        const user = await this.client.getEntity(u);
+        if (!(user instanceof Api.User)) {
+          failed.push(u);
+          continue;
+        }
+        const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
+
+        if (entity instanceof Api.Channel) {
+          await this.client.invoke(new Api.channels.InviteToChannel({ channel: entity, users: [inputUser] }));
+        } else if (entity instanceof Api.Chat) {
+          await this.client.invoke(
+            new Api.messages.AddChatUser({ chatId: entity.id, userId: inputUser, fwdLimit: 50 }),
+          );
+        }
+        invited.push(u);
+      } catch {
+        failed.push(u);
+      }
+    }
+
+    return { invited, failed };
+  }
+
+  async kickUser(chatId: string, userId: string): Promise<void> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+    const user = await this.client.getEntity(userId);
+    if (!(user instanceof Api.User)) throw new Error("Target is not a user");
+    const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
+
+    if (entity instanceof Api.Channel) {
+      // Kick = ban + unban (removes without permanent ban)
+      await this.client.invoke(
+        new Api.channels.EditBanned({
+          channel: entity,
+          participant: inputUser,
+          bannedRights: new Api.ChatBannedRights({ untilDate: 0, viewMessages: true }),
+        }),
+      );
+      await this.client.invoke(
+        new Api.channels.EditBanned({
+          channel: entity,
+          participant: inputUser,
+          bannedRights: new Api.ChatBannedRights({ untilDate: 0 }),
+        }),
+      );
+    } else if (entity instanceof Api.Chat) {
+      await this.client.invoke(new Api.messages.DeleteChatUser({ chatId: entity.id, userId: inputUser }));
+    }
+  }
+
+  async banUser(chatId: string, userId: string): Promise<void> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+    const user = await this.client.getEntity(userId);
+    if (!(user instanceof Api.User)) throw new Error("Target is not a user");
+    if (!(entity instanceof Api.Channel)) throw new Error("Ban is only supported for supergroups and channels");
+
+    const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
+    await this.client.invoke(
+      new Api.channels.EditBanned({
+        channel: entity,
+        participant: inputUser,
+        bannedRights: new Api.ChatBannedRights({ untilDate: 0, viewMessages: true }),
+      }),
+    );
+  }
+
+  async unbanUser(chatId: string, userId: string): Promise<void> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+    const user = await this.client.getEntity(userId);
+    if (!(user instanceof Api.User)) throw new Error("Target is not a user");
+    if (!(entity instanceof Api.Channel)) throw new Error("Unban is only supported for supergroups and channels");
+
+    const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
+    await this.client.invoke(
+      new Api.channels.EditBanned({
+        channel: entity,
+        participant: inputUser,
+        bannedRights: new Api.ChatBannedRights({ untilDate: 0 }),
+      }),
+    );
+  }
+
+  async editGroup(
+    chatId: string,
+    options: { title?: string; description?: string; photoPath?: string },
+  ): Promise<void> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+
+    if (options.title) {
+      if (entity instanceof Api.Channel) {
+        await this.client.invoke(new Api.channels.EditTitle({ channel: entity, title: options.title }));
+      } else if (entity instanceof Api.Chat) {
+        await this.client.invoke(new Api.messages.EditChatTitle({ chatId: entity.id, title: options.title }));
+      }
+    }
+
+    if (options.description != null) {
+      await this.client.invoke(new Api.messages.EditChatAbout({ peer: entity, about: options.description }));
+    }
+
+    if (options.photoPath) {
+      const fileData = readFileSync(options.photoPath);
+      const uploaded = await this.client.uploadFile({
+        file: new CustomFile(options.photoPath, fileData.length, options.photoPath, fileData),
+        workers: 1,
+      });
+      const inputPhoto = new Api.InputChatUploadedPhoto({ file: uploaded });
+
+      if (entity instanceof Api.Channel) {
+        await this.client.invoke(new Api.channels.EditPhoto({ channel: entity, photo: inputPhoto }));
+      } else if (entity instanceof Api.Chat) {
+        await this.client.invoke(new Api.messages.EditChatPhoto({ chatId: entity.id, photo: inputPhoto }));
+      }
+    }
+  }
+
+  async leaveGroup(chatId: string): Promise<void> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+
+    if (entity instanceof Api.Channel) {
+      await this.client.invoke(new Api.channels.LeaveChannel({ channel: entity }));
+    } else if (entity instanceof Api.Chat) {
+      await this.client.invoke(
+        new Api.messages.DeleteChatUser({
+          chatId: entity.id,
+          userId: new Api.InputUserSelf(),
+        }),
+      );
+    } else {
+      throw new Error("Target is not a group or channel");
+    }
+  }
+
+  async setAdmin(chatId: string, userId: string, options?: { title?: string }): Promise<void> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+    if (!(entity instanceof Api.Channel)) throw new Error("Set admin is only supported for supergroups and channels");
+
+    const user = await this.client.getEntity(userId);
+    if (!(user instanceof Api.User)) throw new Error("Target is not a user");
+
+    const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
+    await this.client.invoke(
+      new Api.channels.EditAdmin({
+        channel: entity,
+        userId: inputUser,
+        adminRights: new Api.ChatAdminRights({
+          changeInfo: true,
+          postMessages: true,
+          editMessages: true,
+          deleteMessages: true,
+          banUsers: true,
+          inviteUsers: true,
+          pinMessages: true,
+          manageCall: true,
+        }),
+        rank: options?.title ?? "",
+      }),
+    );
+  }
+
+  async removeAdmin(chatId: string, userId: string): Promise<void> {
+    if (!this.client) throw new Error("Not connected");
+
+    const entity = await this.client.getEntity(chatId);
+    if (!(entity instanceof Api.Channel))
+      throw new Error("Remove admin is only supported for supergroups and channels");
+
+    const user = await this.client.getEntity(userId);
+    if (!(user instanceof Api.User)) throw new Error("Target is not a user");
+
+    const inputUser = new Api.InputUser({ userId: user.id, accessHash: user.accessHash ?? bigInt.zero });
+    await this.client.invoke(
+      new Api.channels.EditAdmin({
+        channel: entity,
+        userId: inputUser,
+        adminRights: new Api.ChatAdminRights({}),
+        rank: "",
+      }),
+    );
   }
 }
