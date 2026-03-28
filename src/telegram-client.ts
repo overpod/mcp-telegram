@@ -1434,4 +1434,97 @@ export class TelegramService {
 
     throw new Error("Target is not a group or channel. Use username, @username, or invite link.");
   }
+
+  async createGroup(options: {
+    title: string;
+    users: string[];
+    supergroup?: boolean;
+    forum?: boolean;
+    description?: string;
+  }): Promise<{ id: string; title: string; type: string; inviteLink?: string }> {
+    if (!this.client) throw new Error("Not connected");
+
+    const { title, users, supergroup = false, forum = false, description } = options;
+
+    if (supergroup || forum) {
+      // Create supergroup/channel via channels.CreateChannel
+      const result = await this.client.invoke(
+        new Api.channels.CreateChannel({
+          title,
+          about: description ?? "",
+          megagroup: true,
+          forum: forum || undefined,
+        }),
+      );
+
+      const chat = (result as Api.Updates).chats?.[0];
+      if (!chat) throw new Error("Failed to create supergroup");
+
+      const channelId = chat.id.toString();
+
+      // Invite users
+      if (users.length > 0) {
+        const inputUsers: Api.TypeInputUser[] = [];
+        for (const u of users) {
+          try {
+            const entity = await this.client.getEntity(u);
+            if (entity instanceof Api.User) {
+              inputUsers.push(new Api.InputUser({ userId: entity.id, accessHash: entity.accessHash ?? bigInt.zero }));
+            }
+          } catch {
+            // Skip unresolvable users
+          }
+        }
+        if (inputUsers.length > 0) {
+          await this.client.invoke(
+            new Api.channels.InviteToChannel({
+              channel: chat as Api.Channel,
+              users: inputUsers,
+            }),
+          );
+        }
+      }
+
+      // Get invite link
+      let inviteLink: string | undefined;
+      try {
+        const exported = await this.client.invoke(new Api.messages.ExportChatInvite({ peer: chat as Api.Channel }));
+        if (exported instanceof Api.ChatInviteExported) {
+          inviteLink = exported.link;
+        }
+      } catch {}
+
+      return { id: channelId, title, type: forum ? "forum" : "supergroup", inviteLink };
+    }
+
+    // Create basic group via messages.CreateChat
+    const inputUsers: Api.TypeInputUser[] = [];
+    for (const u of users) {
+      try {
+        const entity = await this.client.getEntity(u);
+        if (entity instanceof Api.User) {
+          inputUsers.push(new Api.InputUser({ userId: entity.id, accessHash: entity.accessHash ?? bigInt.zero }));
+        }
+      } catch {
+        // Skip unresolvable users
+      }
+    }
+
+    if (inputUsers.length === 0) {
+      throw new Error("At least one valid user is required to create a basic group");
+    }
+
+    const result = await this.client.invoke(
+      new Api.messages.CreateChat({
+        title,
+        users: inputUsers,
+      }),
+    );
+
+    const updates = result as unknown as Api.Updates;
+    const chat = updates.chats?.[0];
+    if (!chat) throw new Error("Failed to create group");
+
+    return { id: chat.id.toString(), title, type: "group" };
+  }
 }

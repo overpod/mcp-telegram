@@ -125,6 +125,37 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
   );
 
   server.registerTool(
+    "telegram-create-group",
+    {
+      description: "Create a new Telegram group or supergroup",
+      inputSchema: {
+        title: z.string().describe("Group name"),
+        users: z.array(z.string()).describe("Usernames or IDs to invite"),
+        supergroup: z.boolean().default(false).describe("Create as supergroup (supports >200 members, admin features)"),
+        forum: z.boolean().default(false).describe("Enable topics (requires supergroup)"),
+        description: z.string().optional().describe("Group description"),
+      },
+      annotations: WRITE,
+    },
+    async ({ title, users, supergroup, forum, description }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const result = await telegram.createGroup({ title, users, supergroup, forum, description });
+        const lines = [
+          `Created ${result.type}: ${result.title}`,
+          `ID: ${result.id}`,
+          ...(result.inviteLink ? [`Invite link: ${result.inviteLink}`] : []),
+        ];
+        return ok(lines.join("\n"));
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
     "telegram-join-chat",
     {
       description: "Join a Telegram group or channel by username or invite link",

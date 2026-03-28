@@ -532,12 +532,31 @@ src/
 - **[tsx](https://tsx.is/)** -- TypeScript execution without a build step
 - **[dotenv](https://github.com/motdotla/dotenv)** -- Environment variable management
 
+## Troubleshooting
+
+### AUTH_KEY_DUPLICATED
+
+A Telegram session can only be used by **one process at a time**. If you get `AUTH_KEY_DUPLICATED`, it means another process is already using the same session file.
+
+**Solution**: Create separate sessions for each environment:
+
+```bash
+# Local development
+TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-local npx @overpod/mcp-telegram login
+
+# Production server
+TELEGRAM_SESSION_PATH=~/.mcp-telegram/session-prod npx @overpod/mcp-telegram login
+```
+
+Then set `TELEGRAM_SESSION_PATH` in each environment's MCP config accordingly.
+
 ## Security
 
 - API credentials are stored in `.env` (gitignored)
 - Session is stored in `~/.mcp-telegram/session` with `0600` permissions (owner-only access)
 - Session directory is created with `0700` permissions
 - Phone number is **not required** -- QR-only authentication
+- **One session per process** -- using the same session in multiple processes simultaneously causes `AUTH_KEY_DUPLICATED` errors (see [Troubleshooting](#troubleshooting))
 - This is a **userbot** (personal account), not a bot -- respect the [Telegram Terms of Service](https://core.telegram.org/api/terms)
 
 ## License
