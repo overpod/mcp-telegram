@@ -116,8 +116,35 @@ export function registerChatTools(server: McpServer, telegram: TelegramService) 
 
       try {
         const members = await telegram.getChatMembers(chatId, limit);
-        const text = members.map((m) => `${m.name}${m.username ? ` (@${m.username})` : ""} (${m.id})`).join("\n");
+        const text = members
+          .map((m) => {
+            const role = m.role !== "member" ? ` [${m.role}]` : "";
+            return `${m.name}${m.username ? ` (@${m.username})` : ""} (${m.id})${role}`;
+          })
+          .join("\n");
         return ok(sanitize(text) || "No members found");
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "telegram-get-my-role",
+    {
+      description: "Get the current user's role in a chat (creator, admin, or member)",
+      inputSchema: {
+        chatId: z.string().describe("Chat ID or username"),
+      },
+      annotations: READ_ONLY,
+    },
+    async ({ chatId }) => {
+      const err = await requireConnection(telegram);
+      if (err) return fail(new Error(err));
+
+      try {
+        const result = await telegram.getMyRole(chatId);
+        return ok(`Role: ${result.role}\nChat: ${result.chatName} (${result.chatId})`);
       } catch (e) {
         return fail(e);
       }

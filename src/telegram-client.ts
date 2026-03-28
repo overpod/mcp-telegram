@@ -1015,21 +1015,107 @@ export class TelegramService {
     return contacts.slice(0, limit);
   }
 
-  async getChatMembers(chatId: string, limit = 50): Promise<Array<{ id: string; name: string; username?: string }>> {
+  async getChatMembers(
+    chatId: string,
+    limit = 50,
+  ): Promise<Array<{ id: string; name: string; username?: string; role: string }>> {
     if (!this.client || !this.connected) throw new Error("Not connected");
-    const participants = await this.client.getParticipants(chatId, { limit });
-    const members: Array<{ id: string; name: string; username?: string }> = [];
-    for (const p of participants) {
-      if (p instanceof Api.User) {
+    const entity = await this.resolveChat(chatId);
+
+    if (entity instanceof Api.Channel) {
+      const result = await this.client.invoke(
+        new Api.channels.GetParticipants({
+          channel: entity,
+          filter: new Api.ChannelParticipantsRecent(),
+          offset: 0,
+          limit,
+          hash: bigInt.zero,
+        }),
+      );
+      if (!(result instanceof Api.channels.ChannelParticipants)) return [];
+
+      const userMap = new Map<string, Api.User>();
+      for (const u of result.users) {
+        if (u instanceof Api.User) userMap.set(u.id.toString(), u);
+      }
+
+      return result.participants.map((p) => {
+        const userId = this.getParticipantUserId(p);
+        const user = userMap.get(userId);
+        const parts = user ? [user.firstName, user.lastName].filter(Boolean) : [];
+        return {
+          id: userId,
+          name: parts.join(" ") || "Unknown",
+          username: user?.username ?? undefined,
+          role: this.getParticipantRole(p),
+        };
+      });
+    }
+
+    // Basic group — use getParticipants (no role info available)
+    const participants = await this.client.getParticipants(entity, { limit });
+    return participants
+      .filter((p): p is Api.User => p instanceof Api.User)
+      .map((p) => {
         const parts = [p.firstName, p.lastName].filter(Boolean);
-        members.push({
+        return {
           id: p.id.toString(),
           name: parts.join(" ") || "Unknown",
           username: p.username ?? undefined,
-        });
-      }
+          role: "member",
+        };
+      });
+  }
+
+  async getMyRole(chatId: string): Promise<{ role: string; chatId: string; chatName: string }> {
+    if (!this.client || !this.connected) throw new Error("Not connected");
+    const entity = await this.resolveChat(chatId);
+    const me = await this.getMe();
+
+    if (entity instanceof Api.Channel) {
+      const result = await this.client.invoke(
+        new Api.channels.GetParticipant({ channel: entity, participant: new Api.InputUserSelf() }),
+      );
+      return {
+        role: this.getParticipantRole(result.participant),
+        chatId: entity.id.toString(),
+        chatName: entity.title ?? "Unknown",
+      };
     }
-    return members;
+
+    if (entity instanceof Api.Chat) {
+      // Basic group — check if creator
+      if (entity.creator) {
+        return { role: "creator", chatId: entity.id.toString(), chatName: entity.title ?? "Unknown" };
+      }
+      if (entity.adminRights) {
+        return { role: "admin", chatId: entity.id.toString(), chatName: entity.title ?? "Unknown" };
+      }
+      return { role: "member", chatId: entity.id.toString(), chatName: entity.title ?? "Unknown" };
+    }
+
+    if (entity instanceof Api.User) {
+      return { role: "user", chatId: entity.id.toString(), chatName: me.username ?? "self" };
+    }
+
+    return { role: "unknown", chatId: chatId, chatName: "Unknown" };
+  }
+
+  private getParticipantUserId(p: Api.TypeChannelParticipant): string {
+    if (p instanceof Api.ChannelParticipantCreator) return p.userId.toString();
+    if (p instanceof Api.ChannelParticipantAdmin) return p.userId.toString();
+    if (p instanceof Api.ChannelParticipantSelf) return p.userId.toString();
+    if (p instanceof Api.ChannelParticipantBanned) return (p.peer as Api.PeerUser)?.userId?.toString() ?? "0";
+    if (p instanceof Api.ChannelParticipant) return p.userId.toString();
+    return "0";
+  }
+
+  private getParticipantRole(p: Api.TypeChannelParticipant): string {
+    if (p instanceof Api.ChannelParticipantCreator) return "creator";
+    if (p instanceof Api.ChannelParticipantAdmin) return "admin";
+    if (p instanceof Api.ChannelParticipantBanned) return "banned";
+    if (p instanceof Api.ChannelParticipantLeft) return "left";
+    return "member";
   }
 
   async getProfile(userId: string): Promise<{
