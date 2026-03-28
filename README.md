@@ -204,302 +204,13 @@ const telegramMcp = new MCPClient({
 });
 ```
 
-## Available Tools
+## Tools
 
-### Connection
+All tools are auto-discoverable via MCP — your AI client will see the full list with parameters and descriptions when connected.
 
-| Tool | Description |
-|------|-------------|
-| `telegram-status` | Check connection status and current account info |
-| `telegram-login` | Authenticate via QR code |
+**Categories:** authentication, messaging (send, edit, delete, forward, schedule, polls), reading (chats, messages, search, unread), forum topics, group management (create, edit, invite, kick, ban, admin, leave), contacts & moderation, user profiles, reactions, media.
 
-### Messaging
-
-| Tool | Description |
-|------|-------------|
-| `telegram-send-message` | Send a text message to a chat |
-| `telegram-send-file` | Send a file (photo, document, video, etc.) to a chat |
-| `telegram-send-reaction` | Send or remove an emoji reaction on a message |
-| `telegram-send-scheduled` | Schedule a message for future delivery |
-| `telegram-create-poll` | Create a poll (multiple choice or quiz mode) |
-| `telegram-edit-message` | Edit a previously sent message |
-| `telegram-delete-message` | Delete messages in a chat |
-| `telegram-forward-message` | Forward messages between chats |
-
-### Reading
-
-| Tool | Description |
-|------|-------------|
-| `telegram-list-chats` | List recent dialogs with unread counts, bot/contact markers |
-| `telegram-read-messages` | Read recent messages from a chat |
-| `telegram-search-chats` | Search for chats, users, or channels by name |
-| `telegram-search-messages` | Search messages in a chat by text |
-| `telegram-search-global` | Search messages across all public chats and channels |
-| `telegram-get-unread` | Get chats with unread messages; forums show per-topic unread breakdown |
-| `telegram-get-contact-requests` | Get incoming messages from non-contacts with preview |
-
-### Forum Topics
-
-| Tool | Description |
-|------|-------------|
-| `telegram-list-topics` | List forum topics in a group with unread counts and status |
-| `telegram-read-topic-messages` | Read messages from a specific forum topic |
-
-### Chat Management
-
-| Tool | Description |
-|------|-------------|
-| `telegram-mark-as-read` | Mark a chat as read |
-| `telegram-get-chat-info` | Get detailed info about a chat (name, type, members, bot/contact status) |
-| `telegram-get-chat-members` | List members of a group or channel |
-| `telegram-join-chat` | Join a group or channel by username or invite link |
-| `telegram-pin-message` | Pin a message in a chat |
-| `telegram-unpin-message` | Unpin a message in a chat |
-
-### Contacts & Moderation
-
-| Tool | Description |
-|------|-------------|
-| `telegram-add-contact` | Add a user to your contacts (accept contact request) |
-| `telegram-block-user` | Block a user from sending you messages |
-| `telegram-report-spam` | Report a chat as spam to Telegram |
-
-### User Info
-
-| Tool | Description |
-|------|-------------|
-| `telegram-get-contacts` | Get your contacts list with phone numbers |
-| `telegram-get-profile` | Get detailed profile info for a user (bio, photo, last seen) |
-| `telegram-get-profile-photo` | Get a user's or chat's profile photo (inline or file) |
-| `telegram-get-reactions` | Get reactions on a specific message with user details |
-
-### Media
-
-| Tool | Description |
-|------|-------------|
-| `telegram-download-media` | Download media from a message to a local file |
-
-## Tool Parameters
-
-### Common patterns
-
-Most tools accept `chatId` as a string -- either a numeric ID (e.g., `"-1001234567890"`) or a username (e.g., `"@username"`).
-
-### telegram-send-message
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `text` | string | yes | Message text |
-| `replyTo` | number | no | Message ID to reply to |
-| `parseMode` | `"md"` / `"html"` | no | Message formatting mode |
-| `topicId` | number | no | Forum topic ID to send into (for groups with Topics) |
-
-### telegram-list-topics
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username (group with Topics enabled) |
-| `limit` | number | no | Max topics to return (default: 100) |
-
-### telegram-read-topic-messages
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `topicId` | number | yes | Topic ID (from `telegram-list-topics`) |
-| `limit` | number | no | Number of messages (default: 20) |
-| `offsetId` | number | no | Message ID for pagination |
-
-### telegram-list-chats
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `limit` | number | no | Number of chats to return (default: 20) |
-| `offsetDate` | number | no | Unix timestamp for pagination |
-| `filterType` | `"private"` / `"group"` / `"channel"` / `"contact_requests"` | no | Filter by chat type |
-
-### telegram-read-messages
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `limit` | number | no | Number of messages (default: 10) |
-| `offsetId` | number | no | Message ID for pagination |
-
-### telegram-send-file
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `filePath` | string | yes | Absolute path to the file |
-| `caption` | string | no | File caption |
-
-### telegram-download-media
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `messageId` | number | yes | Message ID containing media |
-| `downloadPath` | string | yes | Absolute path to save the file |
-
-### telegram-forward-message
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `fromChatId` | string | yes | Source chat ID or @username |
-| `toChatId` | string | yes | Destination chat ID or @username |
-| `messageIds` | number[] | yes | Array of message IDs to forward |
-
-### telegram-edit-message
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `messageId` | number | yes | ID of the message to edit |
-| `text` | string | yes | New message text |
-
-### telegram-delete-message
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `messageIds` | number[] | yes | Array of message IDs to delete |
-
-### telegram-pin-message
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `messageId` | number | yes | Message ID to pin |
-| `silent` | boolean | no | Pin without notification (default: false) |
-
-### telegram-join-chat
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `target` | string | yes | Username (@group), link (t.me/group), or invite link (t.me/+xxx) |
-
-### telegram-send-reaction
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `messageId` | number | yes | Message ID to react to |
-| `emoji` | string \| string[] | no | Single emoji `"👍"` or array `["👍","🔥"]`. Omit to remove all reactions |
-| `addToExisting` | boolean | no | Add to existing reactions instead of replacing (default: false) |
-
-### telegram-send-scheduled
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username (use `"me"` or `"self"` for Saved Messages) |
-| `text` | string | yes | Message text |
-| `scheduleDate` | number | yes | Unix timestamp when to send (must be in the future) |
-| `replyTo` | number | no | Message ID to reply to |
-| `parseMode` | `"md"` / `"html"` | no | Message formatting mode |
-
-### telegram-create-poll
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `question` | string | yes | Poll question |
-| `answers` | string[] | yes | Answer options (2-10 items) |
-| `multipleChoice` | boolean | no | Allow multiple answers (default: false) |
-| `quiz` | boolean | no | Quiz mode with one correct answer (default: false) |
-| `correctAnswer` | number | no | Index of correct answer, 0-based (required for quiz mode) |
-
-### telegram-search-messages
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `query` | string | yes | Search text |
-| `limit` | number | no | Max results (default: 20) |
-
-### telegram-search-global
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `query` | string | yes | Search text |
-| `limit` | number | no | Max results (default: 20) |
-| `minDate` | number | no | Unix timestamp: only messages after this date |
-| `maxDate` | number | no | Unix timestamp: only messages before this date |
-
-### telegram-search-chats
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `query` | string | yes | Search query (name or username) |
-| `limit` | number | no | Max results (default: 10) |
-
-### telegram-get-chat-members
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `limit` | number | no | Number of members (default: 50) |
-
-### telegram-get-contacts
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `limit` | number | no | Number of contacts (default: 50) |
-
-### telegram-get-profile
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `userId` | string | yes | User ID or @username |
-
-### telegram-get-profile-photo
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `entityId` | string | yes | User/Chat/Channel ID or username |
-| `savePath` | string | no | Absolute path to save file. If omitted, returns inline base64 image |
-| `size` | `"small"` / `"big"` | no | Photo size: small (160x160) or big (640x640). Default: big |
-
-### telegram-get-reactions
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username |
-| `messageId` | number | yes | Message ID to get reactions for |
-
-### telegram-get-unread
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `limit` | number | no | Number of unread chats (default: 20) |
-
-### telegram-get-contact-requests
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `limit` | number | no | Number of contact requests (default: 20) |
-
-### telegram-add-contact
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `userId` | string | yes | User ID or @username to add |
-| `firstName` | string | yes | First name for the contact |
-| `lastName` | string | no | Last name for the contact |
-| `phone` | string | no | Phone number for the contact |
-
-### telegram-block-user
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `userId` | string | yes | User ID or @username to block |
-
-### telegram-report-spam
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `chatId` | string | yes | Chat ID or @username to report |
+> **Tip**: Ask your AI assistant *"What Telegram tools are available?"* to get the current list with parameters.
 
 ## Development
 
@@ -517,9 +228,18 @@ npm run format     # Format code with Biome
 
 ```
 src/
-  index.ts            -- MCP server entry point, tool definitions
+  index.ts            -- MCP server entry point
   telegram-client.ts  -- TelegramService class (GramJS wrapper)
   qr-login-cli.ts     -- CLI utility for QR code login
+  tools/              -- Modular tool definitions
+    auth.ts           -- Connection & login
+    messages.ts       -- Send, read, search, edit, delete, forward
+    chats.ts          -- Chat listing, group management, admin
+    contacts.ts       -- Contacts, profiles, moderation
+    media.ts          -- Files, photos
+    reactions.ts      -- Reactions
+    extras.ts         -- Pin, schedule, polls, topics
+    shared.ts         -- Shared utilities
 ```
 
 ## Tech Stack
