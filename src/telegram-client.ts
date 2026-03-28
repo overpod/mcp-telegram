@@ -7,6 +7,7 @@ import bigInt from "big-integer";
 import QRCode from "qrcode";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
+import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { Api } from "telegram/tl/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -19,6 +20,26 @@ const MIN_SESSION_LENGTH = 100;
 
 function resolveSessionPath(sessionPath?: string): string {
   return sessionPath ?? process.env.TELEGRAM_SESSION_PATH ?? DEFAULT_SESSION_FILE;
+}
+
+function resolveProxy(): ProxyInterface | undefined {
+  const ip = process.env.TELEGRAM_PROXY_IP;
+  const port = process.env.TELEGRAM_PROXY_PORT;
+  if (!ip || !port) return undefined;
+
+  const secret = process.env.TELEGRAM_PROXY_SECRET;
+  if (secret) {
+    return { ip, port: Number(port), secret, MTProxy: true as const };
+  }
+
+  const socksType = Number(process.env.TELEGRAM_PROXY_SOCKS_TYPE || "5");
+  return {
+    ip,
+    port: Number(port),
+    socksType: socksType as 4 | 5,
+    ...(process.env.TELEGRAM_PROXY_USERNAME && { username: process.env.TELEGRAM_PROXY_USERNAME }),
+    ...(process.env.TELEGRAM_PROXY_PASSWORD && { password: process.env.TELEGRAM_PROXY_PASSWORD }),
+  };
 }
 
 function ensureSessionDir(filePath: string): void {
@@ -105,8 +126,10 @@ export class TelegramService {
     }
 
     const session = new StringSession(this.sessionString);
+    const proxy = resolveProxy();
     this.client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
+      ...(proxy && { proxy }),
     });
 
     try {
@@ -205,8 +228,10 @@ export class TelegramService {
     message: string;
   }> {
     const session = new StringSession("");
+    const proxy = resolveProxy();
     const client = new TelegramClient(session, this.apiId, this.apiHash, {
       connectionRetries: 5,
+      ...(proxy && { proxy }),
     });
 
     try {
