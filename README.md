@@ -22,6 +22,7 @@ An MCP (Model Context Protocol) server that connects AI assistants like Claude t
 - **Userbot** -- operates as your personal account, not a bot
 - **Full-featured** -- messaging, reactions, polls, scheduled messages, media, contacts, and more
 - **Forum Topics** -- list topics, read per-topic messages, send to specific topics, per-topic unread counts
+- **Rate limiting & retry** -- automatic FLOOD_WAIT handling, network error recovery, exponential backoff
 - **QR code login** -- authenticate by scanning a QR code in the Telegram app
 - **Session persistence** -- login once, stay connected across restarts
 - **Human-readable output** -- sender names are resolved, not just numeric IDs
@@ -304,6 +305,17 @@ src/
 - **[Biome](https://biomejs.dev/)** -- Linter and formatter
 - **[tsx](https://tsx.is/)** -- TypeScript execution without a build step
 - **[dotenv](https://github.com/motdotla/dotenv)** -- Environment variable management
+
+## Rate Limiting & Retry
+
+This server includes built-in rate limiting and automatic retry logic to handle Telegram API constraints:
+
+- **Automatic FLOOD_WAIT handling** -- waits the exact time required by Telegram and retries
+- **Network error recovery** -- exponential backoff for temporary network issues
+- **Rate limiting** -- prevents hitting Telegram's rate limits (20 req/s default)
+- **Smart retry** -- up to 3 attempts with appropriate delays
+
+See [RATE_LIMITING.md](RATE_LIMITING.md) for detailed documentation.
 
 ## Troubleshooting
 

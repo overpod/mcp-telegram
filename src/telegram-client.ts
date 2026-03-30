@@ -10,6 +10,7 @@ import { CustomFile } from "telegram/client/uploads.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
+import { RateLimiter } from "./rate-limiter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LEGACY_SESSION_FILE = join(__dirname, "..", ".telegram-session");
@@ -57,6 +58,7 @@ export class TelegramService {
   private sessionString = "";
   private connected = false;
   private sessionPath: string;
+  private rateLimiter: RateLimiter;
   lastError = "";
 
   get sessionDir(): string {
@@ -67,6 +69,13 @@ export class TelegramService {
     this.apiId = apiId;
     this.apiHash = apiHash;
     this.sessionPath = resolveSessionPath(options?.sessionPath);
+    this.rateLimiter = new RateLimiter({
+      maxRequestsPerSecond: 20,
+      maxRetries: 3,
+      initialRetryDelay: 1000,
+      maxRetryDelay: 60000,
+      verbose: false,
+    });
   }
 
   async loadSession(): Promise<boolean> {
@@ -338,35 +347,41 @@ export class TelegramService {
     parseMode?: "md" | "html",
     topicId?: number,
   ): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
-    const resolved = await this.resolvePeer(chatId);
-    if (topicId) {
-      // Forum topics require raw API call with InputReplyToMessage
-      const peer = await this.client.getInputEntity(resolved);
-      await this.client.invoke(
-        new Api.messages.SendMessage({
-          peer,
-          message: text,
-          randomId: bigInt(Math.floor(Math.random() * 1e15)),
-          replyTo: new Api.InputReplyToMessage({
-            replyToMsgId: replyTo ?? topicId,
-            topMsgId: topicId,
+    if (!this.client || !this.connected) throw new Error("Not connected. Run telegram-login to authenticate.");
+    
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      if (topicId) {
+        // Forum topics require raw API call with InputReplyToMessage
+        const peer = await this.client!.getInputEntity(resolved);
+        await this.client!.invoke(
+          new Api.messages.SendMessage({
+            peer,
+            message: text,
+            randomId: bigInt(Math.floor(Math.random() * 1e15)),
+            replyTo: new Api.InputReplyToMessage({
+              replyToMsgId: replyTo ?? topicId,
+              topMsgId: topicId,
+            }),
           }),
-        }),
-      );
-    } else {
-      await this.client.sendMessage(resolved, {
-        message: text,
-        ...(replyTo ? { replyTo } : {}),
-        ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
-      });
-    }
+        );
+      } else {
+        await this.client!.sendMessage(resolved, {
+          message: text,
+          ...(replyTo ? { replyTo } : {}),
+          ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
+        });
+      }
+    }, `sendMessage to ${chatId}`);
   }
 
   async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
-    const resolved = await this.resolvePeer(chatId);
-    await this.client.sendFile(resolved, { file: filePath, caption });
+    if (!this.client || !this.connected) throw new Error("Not connected. Run telegram-login to authenticate.");
+    
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      await this.client!.sendFile(resolved, { file: filePath, caption });
+    }, `sendFile to ${chatId}`);
   }
 
   async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {
@@ -582,15 +597,21 @@ export class TelegramService {
   }
 
   async editMessage(chatId: string, messageId: number, newText: string): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
-    const resolved = await this.resolvePeer(chatId);
-    await this.client.editMessage(resolved, { message: messageId, text: newText });
+    if (!this.client || !this.connected) throw new Error("Not connected. Run telegram-login to authenticate.");
+    
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      await this.client!.editMessage(resolved, { message: messageId, text: newText });
+    }, `editMessage ${messageId} in ${chatId}`);
   }
 
   async deleteMessages(chatId: string, messageIds: number[]): Promise<void> {
-    if (!this.client || !this.connected) throw new Error("Not connected");
-    const resolved = await this.resolvePeer(chatId);
-    await this.client.deleteMessages(resolved, messageIds, { revoke: true });
+    if (!this.client || !this.connected) throw new Error("Not connected. Run telegram-login to authenticate.");
+    
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      await this.client!.deleteMessages(resolved, messageIds, { revoke: true });
+    }, `deleteMessages in ${chatId}`);
   }
 
   /**
@@ -770,29 +791,32 @@ export class TelegramService {
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
-    const resolved = await this.resolvePeer(chatId);
-    const opts: Record<string, unknown> = {
-      limit,
-      ...(offsetId ? { offsetId } : {}),
-      ...(maxDate ? { offsetDate: maxDate } : {}),
-    };
-    const messages = await this.client.getMessages(resolved, opts);
-    let filtered = messages;
-    if (minDate) {
-      filtered = filtered.filter((m) => (m.date ?? 0) >= minDate);
-    }
-    const results = await Promise.all(
-      filtered.map(async (m) => ({
-        id: m.id,
-        text: m.message ?? "",
-        sender: await this.resolveSenderName(m.senderId),
-        date: new Date((m.date ?? 0) * 1000).toISOString(),
-        media: this.extractMediaInfo(m.media),
-        reactions: this.extractReactions(m.reactions),
-      })),
-    );
-    return results;
+    if (!this.client || !this.connected) throw new Error("Not connected. Run telegram-login to authenticate.");
+    
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const opts: Record<string, unknown> = {
+        limit,
+        ...(offsetId ? { offsetId } : {}),
+        ...(maxDate ? { offsetDate: maxDate } : {}),
+      };
+      const messages = await this.client!.getMessages(resolved, opts);
+      let filtered = messages;
+      if (minDate) {
+        filtered = filtered.filter((m) => (m.date ?? 0) >= minDate);
+      }
+      const results = await Promise.all(
+        filtered.map(async (m) => ({
+          id: m.id,
+          text: m.message ?? "",
+          sender: await this.resolveSenderName(m.senderId),
+          date: new Date((m.date ?? 0) * 1000).toISOString(),
+          media: this.extractMediaInfo(m.media),
+          reactions: this.extractReactions(m.reactions),
+        })),
+      );
+      return results;
+    }, `getMessages from ${chatId}`);
   }
 
   async searchChats(
@@ -976,28 +1000,31 @@ export class TelegramService {
       reactions?: { emoji: string; count: number; me: boolean }[];
     }>
   > {
-    if (!this.client || !this.connected) throw new Error("Not connected");
-    const resolved = await this.resolvePeer(chatId);
-    const messages = await this.client.getMessages(resolved, {
-      search: query,
-      limit,
-      ...(maxDate ? { offsetDate: maxDate } : {}),
-    });
-    let filtered = messages;
-    if (minDate) {
-      filtered = filtered.filter((m) => (m.date ?? 0) >= minDate);
-    }
-    const results = await Promise.all(
-      filtered.map(async (m) => ({
-        id: m.id,
-        text: m.message ?? "",
-        sender: await this.resolveSenderName(m.senderId),
-        date: new Date((m.date ?? 0) * 1000).toISOString(),
-        media: this.extractMediaInfo(m.media),
-        reactions: this.extractReactions(m.reactions),
-      })),
-    );
-    return results;
+    if (!this.client || !this.connected) throw new Error("Not connected. Run telegram-login to authenticate.");
+    
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      const messages = await this.client!.getMessages(resolved, {
+        search: query,
+        limit,
+        ...(maxDate ? { offsetDate: maxDate } : {}),
+      });
+      let filtered = messages;
+      if (minDate) {
+        filtered = filtered.filter((m) => (m.date ?? 0) >= minDate);
+      }
+      const results = await Promise.all(
+        filtered.map(async (m) => ({
+          id: m.id,
+          text: m.message ?? "",
+          sender: await this.resolveSenderName(m.senderId),
+          date: new Date((m.date ?? 0) * 1000).toISOString(),
+          media: this.extractMediaInfo(m.media),
+          reactions: this.extractReactions(m.reactions),
+        })),
+      );
+      return results;
+    }, `searchMessages in ${chatId}`);
   }
 
   async getContacts(limit = 50): Promise<Array<{ id: string; name: string; username?: string; phone?: string }>> {
