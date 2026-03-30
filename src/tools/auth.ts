@@ -1,3 +1,5 @@
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TelegramService } from "../telegram-client.js";
 import { fail, ok, READ_ONLY, WRITE } from "./shared.js";
@@ -30,16 +32,10 @@ export function registerAuthTools(server: McpServer, telegram: TelegramService) 
     },
     async () => {
       let qrDataUrl = "";
-      let qrRawUrl = "";
 
-      const loginPromise = telegram.startQrLogin(
-        (dataUrl) => {
-          qrDataUrl = dataUrl;
-        },
-        (url) => {
-          qrRawUrl = url;
-        },
-      );
+      const loginPromise = telegram.startQrLogin((dataUrl) => {
+        qrDataUrl = dataUrl;
+      });
 
       // Wait for first QR to be generated
       const startTime = Date.now();
@@ -60,21 +56,18 @@ export function registerAuthTools(server: McpServer, telegram: TelegramService) 
         }
       });
 
-      // Return as MCP image content + text with fallback options
+      // Save QR to file as fallback (no data sent to third-party services)
       const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
-      const qrApiUrl = qrRawUrl
-        ? `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrRawUrl)}`
-        : "";
+      const qrFilePath = join(telegram.sessionDir, "qr-login.png");
+      await writeFile(qrFilePath, Buffer.from(base64, "base64")).catch(() => {});
 
       const instructions = [
         "Scan this QR code in Telegram: **Settings → Devices → Link Desktop Device**.",
         "",
-        qrApiUrl ? `If the QR image is not visible, open this link in your browser:\n${qrApiUrl}` : "",
+        `If the QR image is not visible, it's also saved to: ${qrFilePath}`,
         "",
         "After scanning, run **telegram-status** to verify the connection.",
-      ]
-        .filter(Boolean)
-        .join("\n");
+      ].join("\n");
 
       return {
         content: [
