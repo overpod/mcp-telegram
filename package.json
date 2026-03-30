@@ -25,7 +25,9 @@
     "prepublishOnly": "npm run build",
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",
-    "format": "biome format --write src/"
+    "format": "biome format --write src/",
+    "test": "tsx --test src/**/*.test.ts",
+    "test:watch": "tsx --test --watch src/**/*.test.ts"
   },
   "keywords": [
     "mcp",
