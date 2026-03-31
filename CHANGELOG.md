@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-03-31
+
 ### Added
-- Improved error messages with actionable hints for connection and authentication issues
+- **Rate limiting & retry** — automatic FLOOD_WAIT handling, network error recovery with exponential backoff (`src/rate-limiter.ts`)
+- `send-message` now returns `messageId` in the response (`Message sent to @user [#12345]`), enabling send → edit workflows (closes #16)
+- Rate limiter unit tests (7 tests in `src/__tests__/rate-limiter.test.ts`)
+
+### Changed
+- `sendMessage()` return type changed from `void` to `Api.Message | Api.UpdateShortSentMessage | undefined`
+- Write methods (`sendMessage`, `sendFile`, `editMessage`, `deleteMessages`) are now rate-limited with automatic retry on transient errors
 
 ## [1.19.0] - 2026-03-30
 

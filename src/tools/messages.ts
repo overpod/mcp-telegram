@@ -22,9 +22,11 @@ export function registerMessageTools(server: McpServer, telegram: TelegramServic
       if (err) return fail(new Error(err));
 
       try {
-        await telegram.sendMessage(chatId, text, replyTo, parseMode, topicId);
+        const result = await telegram.sendMessage(chatId, text, replyTo, parseMode, topicId);
         const dest = topicId ? `topic ${topicId} in ${chatId}` : chatId;
-        return ok(`Message sent to ${dest}`);
+        const messageId = result?.id;
+        const idInfo = messageId ? ` [#${messageId}]` : "";
+        return ok(`Message sent to ${dest}${idInfo}`);
       } catch (e) {
         return fail(e);
       }

@@ -10,6 +10,7 @@ import { CustomFile } from "telegram/client/uploads.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
 import { StringSession } from "telegram/sessions/index.js";
 import { Api } from "telegram/tl/index.js";
+import { RateLimiter } from "./rate-limiter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LEGACY_SESSION_FILE = join(__dirname, "..", ".telegram-session");
@@ -58,6 +59,7 @@ export class TelegramService {
   private sessionString = "";
   private connected = false;
   private sessionPath: string;
+  private rateLimiter = new RateLimiter();
   lastError = "";
 
   get sessionDir(): string {
@@ -338,36 +340,44 @@ export class TelegramService {
     replyTo?: number,
     parseMode?: "md" | "html",
     topicId?: number,
-  ): Promise<void> {
+  ): Promise<Api.Message | Api.UpdateShortSentMessage | undefined> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const resolved = await this.resolvePeer(chatId);
-    if (topicId) {
-      // Forum topics require raw API call with InputReplyToMessage
-      const peer = await this.client.getInputEntity(resolved);
-      await this.client.invoke(
-        new Api.messages.SendMessage({
-          peer,
-          message: text,
-          randomId: bigInt(Math.floor(Math.random() * 1e15)),
-          replyTo: new Api.InputReplyToMessage({
-            replyToMsgId: replyTo ?? topicId,
-            topMsgId: topicId,
+    return this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      if (topicId) {
+        const peer = await this.client?.getInputEntity(resolved);
+        const result = await this.client?.invoke(
+          new Api.messages.SendMessage({
+            peer,
+            message: text,
+            randomId: bigInt(Math.floor(Math.random() * 1e15)),
+            replyTo: new Api.InputReplyToMessage({
+              replyToMsgId: replyTo ?? topicId,
+              topMsgId: topicId,
+            }),
           }),
-        }),
-      );
-    } else {
-      await this.client.sendMessage(resolved, {
+        );
+        if (result instanceof Api.UpdateShortSentMessage) return result;
+        if (result instanceof Api.Updates || result instanceof Api.UpdatesCombined) {
+          const msgUpdate = result.updates.find((u): u is Api.UpdateNewMessage => u instanceof Api.UpdateNewMessage);
+          if (msgUpdate?.message instanceof Api.Message) return msgUpdate.message;
+        }
+        return undefined;
+      }
+      return await this.client?.sendMessage(resolved, {
         message: text,
         ...(replyTo ? { replyTo } : {}),
         ...(parseMode ? { parseMode: parseMode === "html" ? "html" : "md" } : {}),
       });
-    }
+    }, `sendMessage to ${chatId}`);
   }
 
   async sendFile(chatId: string, filePath: string, caption?: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const resolved = await this.resolvePeer(chatId);
-    await this.client.sendFile(resolved, { file: filePath, caption });
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      await this.client?.sendFile(resolved, { file: filePath, caption });
+    }, `sendFile to ${chatId}`);
   }
 
   async downloadMedia(chatId: string, messageId: number, downloadPath: string): Promise<string> {
@@ -584,14 +594,18 @@ export class TelegramService {
 
   async editMessage(chatId: string, messageId: number, newText: string): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const resolved = await this.resolvePeer(chatId);
-    await this.client.editMessage(resolved, { message: messageId, text: newText });
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      await this.client?.editMessage(resolved, { message: messageId, text: newText });
+    }, `editMessage ${messageId} in ${chatId}`);
   }
 
   async deleteMessages(chatId: string, messageIds: number[]): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const resolved = await this.resolvePeer(chatId);
-    await this.client.deleteMessages(resolved, messageIds, { revoke: true });
+    await this.rateLimiter.execute(async () => {
+      const resolved = await this.resolvePeer(chatId);
+      await this.client?.deleteMessages(resolved, messageIds, { revoke: true });
+    }, `deleteMessages in ${chatId}`);
   }
 
   /**
