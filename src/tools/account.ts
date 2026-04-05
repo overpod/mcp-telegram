@@ -32,7 +32,8 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         if (!muted) {
           muteUntil = 0;
         } else if (duration !== undefined && duration > 0) {
-          muteUntil = Math.floor(Date.now() / 1000) + duration;
+          const now = Math.floor(Date.now() / 1000);
+          muteUntil = Math.min(now + duration, MUTE_FOREVER_UNTIL);
         } else {
           muteUntil = MUTE_FOREVER_UNTIL;
         }
@@ -137,12 +138,12 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
     "telegram-terminate-session",
     {
       description:
-        "Terminate a specific Telegram session by its hash, or explicitly terminate all other sessions by setting terminateAllOther=true",
+        "Terminate a specific Telegram session by its hash, or explicitly terminate all other sessions by setting terminateAll=true",
       inputSchema: {
         sessionId: z
           .string()
           .optional()
-          .describe("Session hash to terminate (numeric string from get-sessions). Required when terminateAllOther is false")
+          .describe("Session hash to terminate (numeric string from get-sessions). Required when terminateAll is not set")
           .refine((v) => v === undefined || /^\d+$/.test(v), { message: "sessionId must be a numeric string" }),
         terminateAll: z
           .boolean()
