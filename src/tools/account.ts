@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TelegramService } from "../telegram-client.js";
-import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, WRITE } from "./shared.js";
+import { DESTRUCTIVE, fail, ok, READ_ONLY, requireConnection, sanitize, WRITE } from "./shared.js";
 
 export function registerAccountTools(server: McpServer, telegram: TelegramService) {
   server.registerTool(
@@ -65,7 +65,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
               `[${f.id}] ${f.emoticon ? `${f.emoticon} ` : ""}${f.title} (${f.includeCount} chats, ${f.pinnedCount} pinned)`,
           )
           .join("\n");
-        return ok(text);
+        return ok(sanitize(text));
       } catch (e) {
         return fail(e);
       }
@@ -287,7 +287,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
               `${l.link}${l.title ? ` (${l.title})` : ""} — ${l.usageCount} uses${l.expired ? " [EXPIRED]" : ""}${l.revoked ? " [REVOKED]" : ""}`,
           )
           .join("\n");
-        return ok(text);
+        return ok(sanitize(text));
       } catch (e) {
         return fail(e);
       }
