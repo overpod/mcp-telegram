@@ -143,12 +143,16 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         sessionId: z
           .string()
           .optional()
-          .describe("Session hash to terminate (numeric string from get-sessions). Required when terminateAllOther is not set")
+          .describe(
+            "Session hash to terminate (numeric string from get-sessions). Required when terminateAllOther is not set",
+          )
           .refine((v) => v === undefined || /^\d+$/.test(v), { message: "sessionId must be a numeric string" }),
         terminateAllOther: z
           .boolean()
           .optional()
-          .describe("Set to true to terminate all other sessions (excludes current). Cannot be combined with sessionId"),
+          .describe(
+            "Set to true to terminate all other sessions (excludes current). Cannot be combined with sessionId",
+          ),
       },
       annotations: DESTRUCTIVE,
     },
@@ -274,7 +278,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-get-invite-links",
     {
-      description: "Get list of invite links for a group or channel",
+      description: "Get list of your invite links for a group or channel (links created by the current account)",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         limit: z.number().default(20).describe("Max links to return"),

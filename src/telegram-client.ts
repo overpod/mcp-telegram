@@ -2143,19 +2143,25 @@ export class TelegramService {
 
     // Exceptions must come before the general rule so they are not shadowed
     if (disallowUsers?.length) {
-      const entities = await Promise.all(disallowUsers.map((u) => this.client!.getEntity(u)));
-      const users = entities
-        .filter((e): e is Api.User => e instanceof Api.User)
-        .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
+      const users: Api.InputUser[] = [];
+      for (const u of disallowUsers) {
+        const inputEntity = await this.client.getInputEntity(u);
+        if (inputEntity instanceof Api.InputPeerUser) {
+          users.push(new Api.InputUser({ userId: inputEntity.userId, accessHash: inputEntity.accessHash }));
+        }
+      }
       if (users.length > 0) {
         rules.push(new Api.InputPrivacyValueDisallowUsers({ users }));
       }
     }
     if (allowUsers?.length) {
-      const entities = await Promise.all(allowUsers.map((u) => this.client!.getEntity(u)));
-      const users = entities
-        .filter((e): e is Api.User => e instanceof Api.User)
-        .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
+      const users: Api.InputUser[] = [];
+      for (const u of allowUsers) {
+        const inputEntity = await this.client.getInputEntity(u);
+        if (inputEntity instanceof Api.InputPeerUser) {
+          users.push(new Api.InputUser({ userId: inputEntity.userId, accessHash: inputEntity.accessHash }));
+        }
+      }
       if (users.length > 0) {
         rules.push(new Api.InputPrivacyValueAllowUsers({ users }));
       }
