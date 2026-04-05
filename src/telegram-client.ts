@@ -2016,13 +2016,18 @@ export class TelegramService {
     );
     return result.invites
       .filter((inv): inv is Api.ChatInviteExported => inv instanceof Api.ChatInviteExported)
-      .map((inv) => ({
-        link: inv.link,
-        title: inv.title,
-        expired: inv.expireDate ? inv.expireDate < Math.floor(Date.now() / 1000) : false,
-        revoked: inv.revoked ?? false,
-        usageCount: inv.usage ?? 0,
-      }));
+      .map((inv) => {
+        const expiredByDate = inv.expireDate ? inv.expireDate < Math.floor(Date.now() / 1000) : false;
+        const expiredByUsage =
+          inv.usageLimit !== undefined && inv.usage !== undefined ? inv.usage >= inv.usageLimit : false;
+        return {
+          link: inv.link,
+          title: inv.title,
+          expired: expiredByDate || expiredByUsage,
+          revoked: inv.revoked ?? false,
+          usageCount: inv.usage ?? 0,
+        };
+      });
   }
 
   async revokeInviteLink(chatId: string, link: string): Promise<void> {
@@ -2097,27 +2102,7 @@ export class TelegramService {
 
   async terminateAllOtherSessions(): Promise<void> {
     if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
-    const sessions = await this.getActiveSessions();
-    const failures: Array<{ hash: string; error: string }> = [];
-    for (const s of sessions) {
-      if (!s.current) {
-        try {
-          await this.client.invoke(new Api.account.ResetAuthorization({ hash: bigInt(s.hash) }));
-        } catch (error) {
-          failures.push({
-            hash: s.hash,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-    }
-    if (failures.length > 0) {
-      throw new Error(
-        `Failed to terminate ${failures.length} session(s): ${failures
-          .map((f) => `${f.hash} (${f.error})`)
-          .join(", ")}`,
-      );
-    }
+    await this.client.invoke(new Api.auth.ResetAuthorizations());
   }
 
   private static PRIVACY_KEYS: Record<string, () => Api.TypeInputPrivacyKey> = {
@@ -2148,11 +2133,17 @@ export class TelegramService {
     // Exceptions must come before the general rule so they are not shadowed
     if (disallowUsers?.length) {
       const users: Api.InputUser[] = [];
+      const invalid: string[] = [];
       for (const u of disallowUsers) {
         const inputEntity = await this.client.getInputEntity(u);
         if (inputEntity instanceof Api.InputPeerUser) {
           users.push(new Api.InputUser({ userId: inputEntity.userId, accessHash: inputEntity.accessHash }));
+        } else {
+          invalid.push(u);
         }
+      }
+      if (invalid.length > 0) {
+        throw new Error(`disallowUsers entries are not valid users: ${invalid.join(", ")}`);
       }
       if (users.length > 0) {
         rules.push(new Api.InputPrivacyValueDisallowUsers({ users }));
@@ -2160,11 +2151,17 @@ export class TelegramService {
     }
     if (allowUsers?.length) {
       const users: Api.InputUser[] = [];
+      const invalid: string[] = [];
       for (const u of allowUsers) {
         const inputEntity = await this.client.getInputEntity(u);
         if (inputEntity instanceof Api.InputPeerUser) {
           users.push(new Api.InputUser({ userId: inputEntity.userId, accessHash: inputEntity.accessHash }));
+        } else {
+          invalid.push(u);
         }
+      }
+      if (invalid.length > 0) {
+        throw new Error(`allowUsers entries are not valid users: ${invalid.join(", ")}`);
       }
       if (users.length > 0) {
         rules.push(new Api.InputPrivacyValueAllowUsers({ users }));
