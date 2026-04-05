@@ -1953,4 +1953,211 @@ export class TelegramService {
       }),
     );
   }
+
+  // ── New tools: feature parity ──────────────────────────────────────
+
+  async unblockUser(userId: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const entity = await this.client.getInputEntity(userId);
+    await this.client.invoke(new Api.contacts.Unblock({ id: entity }));
+  }
+
+  async muteChat(chatId: string, muteUntil: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const resolved = await this.resolvePeer(chatId);
+    const peer = await this.client.getInputEntity(resolved);
+    await this.client.invoke(
+      new Api.account.UpdateNotifySettings({
+        peer: new Api.InputNotifyPeer({ peer }),
+        settings: new Api.InputPeerNotifySettings({ muteUntil }),
+      }),
+    );
+  }
+
+  async exportInviteLink(
+    chatId: string,
+    options?: { expireDate?: number; usageLimit?: number; requestNeeded?: boolean; title?: string },
+  ): Promise<string> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const resolved = await this.resolvePeer(chatId);
+    const result = await this.client.invoke(
+      new Api.messages.ExportChatInvite({
+        peer: resolved,
+        expireDate: options?.expireDate,
+        usageLimit: options?.usageLimit,
+        requestNeeded: options?.requestNeeded,
+        title: options?.title,
+      }),
+    );
+    if (result instanceof Api.ChatInviteExported) {
+      return result.link;
+    }
+    throw new Error("Failed to export invite link");
+  }
+
+  async getInviteLinks(
+    chatId: string,
+    limit = 20,
+  ): Promise<Array<{ link: string; title?: string; expired: boolean; revoked: boolean; usageCount: number }>> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const resolved = await this.resolvePeer(chatId);
+    const me = await this.client.getMe();
+    const result = await this.client.invoke(
+      new Api.messages.GetExportedChatInvites({
+        peer: resolved,
+        adminId: new Api.InputUser({ userId: me.id, accessHash: (me as Api.User).accessHash ?? bigInt.zero }),
+        limit,
+      }),
+    );
+    return result.invites
+      .filter((inv): inv is Api.ChatInviteExported => inv instanceof Api.ChatInviteExported)
+      .map((inv) => ({
+        link: inv.link,
+        title: inv.title,
+        expired: inv.expireDate ? inv.expireDate < Math.floor(Date.now() / 1000) : false,
+        revoked: inv.revoked ?? false,
+        usageCount: inv.usage ?? 0,
+      }));
+  }
+
+  async revokeInviteLink(chatId: string, link: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.invoke(
+      new Api.messages.EditExportedChatInvite({
+        peer: resolved,
+        link,
+        revoked: true,
+      }),
+    );
+  }
+
+  async getChatFolders(): Promise<
+    Array<{ id: number; title: string; emoticon?: string; pinnedCount: number; includeCount: number }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.messages.GetDialogFilters());
+    const filters = "filters" in result ? result.filters : [];
+    return filters
+      .filter((f): f is Api.DialogFilter => f instanceof Api.DialogFilter)
+      .map((f) => ({
+        id: f.id,
+        title: typeof f.title === "string" ? f.title : f.title.text,
+        emoticon: f.emoticon,
+        pinnedCount: f.pinnedPeers?.length ?? 0,
+        includeCount: f.includePeers?.length ?? 0,
+      }));
+  }
+
+  async setAutoDelete(chatId: string, period: number): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const resolved = await this.resolvePeer(chatId);
+    await this.client.invoke(new Api.messages.SetHistoryTTL({ peer: resolved, period }));
+  }
+
+  async getActiveSessions(): Promise<
+    Array<{
+      hash: string;
+      device: string;
+      platform: string;
+      appName: string;
+      appVersion: string;
+      ip: string;
+      country: string;
+      dateActive: string;
+      current: boolean;
+    }>
+  > {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const result = await this.client.invoke(new Api.account.GetAuthorizations());
+    return result.authorizations.map((a) => ({
+      hash: a.hash.toString(),
+      device: a.deviceModel,
+      platform: a.platform,
+      appName: a.appName,
+      appVersion: a.appVersion,
+      ip: a.ip,
+      country: a.country,
+      dateActive: new Date(a.dateActive * 1000).toISOString(),
+      current: a.current ?? false,
+    }));
+  }
+
+  async terminateSession(hash: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.client.invoke(new Api.account.ResetAuthorization({ hash: bigInt(hash) }));
+  }
+
+  async terminateAllOtherSessions(): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const sessions = await this.getActiveSessions();
+    for (const s of sessions) {
+      if (!s.current) {
+        await this.client.invoke(new Api.account.ResetAuthorization({ hash: bigInt(s.hash) }));
+      }
+    }
+  }
+
+  private static PRIVACY_KEYS: Record<string, () => Api.TypeInputPrivacyKey> = {
+    phone_number: () => new Api.InputPrivacyKeyPhoneNumber(),
+    last_seen: () => new Api.InputPrivacyKeyStatusTimestamp(),
+    profile_photo: () => new Api.InputPrivacyKeyProfilePhoto(),
+    forwards: () => new Api.InputPrivacyKeyForwards(),
+    calls: () => new Api.InputPrivacyKeyPhoneCall(),
+    groups: () => new Api.InputPrivacyKeyChatInvite(),
+    bio: () => new Api.InputPrivacyKeyAbout(),
+  };
+
+  async setPrivacy(
+    setting: string,
+    rule: "everyone" | "contacts" | "nobody",
+    allowUsers?: string[],
+    disallowUsers?: string[],
+  ): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    const keyFactory = TelegramService.PRIVACY_KEYS[setting];
+    if (!keyFactory)
+      throw new Error(
+        `Unknown privacy setting: ${setting}. Valid: ${Object.keys(TelegramService.PRIVACY_KEYS).join(", ")}`,
+      );
+
+    const rules: Api.TypeInputPrivacyRule[] = [];
+    if (rule === "everyone") rules.push(new Api.InputPrivacyValueAllowAll());
+    else if (rule === "contacts")
+      rules.push(new Api.InputPrivacyValueAllowContacts(), new Api.InputPrivacyValueDisallowAll());
+    else rules.push(new Api.InputPrivacyValueDisallowAll());
+
+    if (allowUsers?.length) {
+      const entities = await Promise.all(allowUsers.map((u) => this.client!.getEntity(u)));
+      const users = entities
+        .filter((e): e is Api.User => e instanceof Api.User)
+        .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
+      rules.push(new Api.InputPrivacyValueAllowUsers({ users }));
+    }
+    if (disallowUsers?.length) {
+      const entities = await Promise.all(disallowUsers.map((u) => this.client!.getEntity(u)));
+      const users = entities
+        .filter((e): e is Api.User => e instanceof Api.User)
+        .map((u) => new Api.InputUser({ userId: u.id, accessHash: u.accessHash ?? bigInt.zero }));
+      rules.push(new Api.InputPrivacyValueDisallowUsers({ users }));
+    }
+
+    await this.client.invoke(new Api.account.SetPrivacy({ key: keyFactory(), rules }));
+  }
+
+  async updateProfile(options: { firstName?: string; lastName?: string; bio?: string }): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.client.invoke(
+      new Api.account.UpdateProfile({
+        firstName: options.firstName,
+        lastName: options.lastName,
+        about: options.bio,
+      }),
+    );
+  }
+
+  async updateUsername(username: string): Promise<void> {
+    if (!this.client || !this.connected) throw new Error(NOT_CONNECTED_ERROR);
+    await this.client.invoke(new Api.account.UpdateUsername({ username }));
+  }
 }
