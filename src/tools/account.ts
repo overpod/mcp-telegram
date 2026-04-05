@@ -138,35 +138,35 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
     "telegram-terminate-session",
     {
       description:
-        "Terminate a specific Telegram session by its hash, or explicitly terminate all other sessions by setting terminateAll=true",
+        "Terminate a specific Telegram session by its hash, or explicitly terminate all other sessions by setting terminateAllOther=true",
       inputSchema: {
         sessionId: z
           .string()
           .optional()
-          .describe("Session hash to terminate (numeric string from get-sessions). Required when terminateAll is not set")
+          .describe("Session hash to terminate (numeric string from get-sessions). Required when terminateAllOther is not set")
           .refine((v) => v === undefined || /^\d+$/.test(v), { message: "sessionId must be a numeric string" }),
-        terminateAll: z
+        terminateAllOther: z
           .boolean()
           .optional()
-          .describe("Set to true to terminate all other sessions. Cannot be combined with sessionId"),
+          .describe("Set to true to terminate all other sessions (excludes current). Cannot be combined with sessionId"),
       },
       annotations: DESTRUCTIVE,
     },
-    async ({ sessionId, terminateAll }) => {
+    async ({ sessionId, terminateAllOther }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
-        if (terminateAll) {
+        if (terminateAllOther) {
           if (sessionId) {
-            return fail(new Error("Provide either sessionId or terminateAll=true, not both"));
+            return fail(new Error("Provide either sessionId or terminateAllOther=true, not both"));
           }
           await telegram.terminateAllOtherSessions();
           return ok("All other sessions terminated");
         }
 
         if (!sessionId) {
-          return fail(new Error("Provide sessionId to terminate a specific session, or set terminateAll=true"));
+          return fail(new Error("Provide sessionId to terminate a specific session, or set terminateAllOther=true"));
         }
 
         await telegram.terminateSession(sessionId);
