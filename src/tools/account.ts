@@ -14,6 +14,8 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         muted: z.boolean().describe("true to mute, false to unmute"),
         duration: z
           .number()
+          .int()
+          .nonnegative()
           .optional()
           .describe("Mute duration in seconds (only when muted=true). Omit to mute forever"),
       },
@@ -35,7 +37,7 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
         await telegram.muteChat(chatId, muteUntil);
         const status = !muted
           ? "unmuted"
-          : duration
+          : duration !== undefined && duration > 0
             ? `muted for ${duration}s`
             : "muted forever";
         return ok(`Chat ${chatId} ${status}`);
