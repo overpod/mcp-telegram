@@ -234,8 +234,9 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
           if (bio !== undefined) updates.push(`bio: ${bio}`);
         }
         if (username !== undefined) {
-          await telegram.updateUsername(username);
-          updates.push(`username: @${username}`);
+          const normalizedUsername = username.replace(/^@/, "");
+          await telegram.updateUsername(normalizedUsername);
+          updates.push(`username: @${normalizedUsername}`);
         }
         return ok(updates.length ? `Profile updated: ${updates.join(", ")}` : "No changes specified");
       } catch (e) {
