@@ -278,19 +278,24 @@ export function registerAccountTools(server: McpServer, telegram: TelegramServic
   server.registerTool(
     "telegram-get-invite-links",
     {
-      description: "Get list of your invite links for a group or channel (links created by the current account)",
+      description:
+        "Get list of invite links for a group or channel. By default returns links created by the current account; pass adminId to query another admin's links",
       inputSchema: {
         chatId: z.string().describe("Chat ID or username"),
         limit: z.number().default(20).describe("Max links to return"),
+        adminId: z
+          .string()
+          .optional()
+          .describe("Admin user ID or username to list links for (default: current account)"),
       },
       annotations: READ_ONLY,
     },
-    async ({ chatId, limit }) => {
+    async ({ chatId, limit, adminId }) => {
       const err = await requireConnection(telegram);
       if (err) return fail(new Error(err));
 
       try {
-        const links = await telegram.getInviteLinks(chatId, limit);
+        const links = await telegram.getInviteLinks(chatId, limit, adminId);
         if (links.length === 0) return ok("No invite links");
         const text = links
           .map(
