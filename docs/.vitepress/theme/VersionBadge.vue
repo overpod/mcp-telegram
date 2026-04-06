@@ -1,6 +1,6 @@
 <script setup>
 defineProps({
-  version: { type: String, default: "1.24.0" },
+  version: { type: String, required: true },
 });
 </script>
 
