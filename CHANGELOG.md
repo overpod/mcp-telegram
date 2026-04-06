@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-04-06
+
+### Added
+- **Sticker tools** — 5 new tools (59 total): `telegram-get-sticker-set`, `telegram-search-sticker-sets`, `telegram-get-installed-stickers`, `telegram-send-sticker`, `telegram-get-recent-stickers`
+- **Pre-built binaries** — zero-dependency standalone executables for Linux (x64/ARM64), macOS (x64/ARM64), Windows (x64)
+- **Documentation site** — VitePress-based docs at overpod.github.io/mcp-telegram with i18n (English, Russian, Chinese)
+
+## [1.23.0] - 2026-04-05
+
+### Added
+- 11 new tools (22 total): `telegram-send-reaction`, `telegram-edit-message`, `telegram-delete-message`, `telegram-forward-message`, `telegram-mark-as-read`, `telegram-get-dialogs`, `telegram-get-chat-info`, `telegram-send-file`, `telegram-add-contact`, `telegram-create-poll`, `telegram-manage-topics`
+- Account management tools: `telegram-get-sessions`, `telegram-terminate-session`, `telegram-set-privacy`, `telegram-set-auto-delete`, `telegram-update-profile`
+- Better entity resolution for channels and supergroups
+
 ## [1.22.0] - 2026-04-01
 
 ### Added
@@ -257,7 +271,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session persistence
 - GramJS/MTProto integration
 
-[Unreleased]: https://github.com/overpod/mcp-telegram/compare/v1.19.0...HEAD
+[Unreleased]: https://github.com/overpod/mcp-telegram/compare/v1.24.0...HEAD
+[1.24.0]: https://github.com/overpod/mcp-telegram/compare/v1.23.0...v1.24.0
+[1.23.0]: https://github.com/overpod/mcp-telegram/compare/v1.22.0...v1.23.0
+[1.22.0]: https://github.com/overpod/mcp-telegram/compare/v1.21.0...v1.22.0
+[1.21.0]: https://github.com/overpod/mcp-telegram/compare/v1.20.0...v1.21.0
+[1.20.0]: https://github.com/overpod/mcp-telegram/compare/v1.19.0...v1.20.0
 [1.19.0]: https://github.com/overpod/mcp-telegram/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/overpod/mcp-telegram/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/overpod/mcp-telegram/compare/v1.16.0...v1.17.0

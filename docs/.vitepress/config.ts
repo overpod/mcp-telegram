@@ -1,9 +1,13 @@
 import { defineConfig } from "vitepress";
+import { version } from "../../package.json";
+
+const DOCS_VERSION = `v${version}`;
 
 const enNav = [
   { text: "Guide", link: "/getting-started/credentials" },
   { text: "Platforms", link: "/platforms/claude-desktop" },
   { text: "Tools", link: "/tools/reference" },
+  { text: DOCS_VERSION, link: "/changelog" },
   { text: "Cloud", link: "https://mcp-telegram.com" },
 ];
 
@@ -11,6 +15,7 @@ const ruNav = [
   { text: "Руководство", link: "/ru/getting-started/credentials" },
   { text: "Платформы", link: "/ru/platforms/claude-desktop" },
   { text: "Инструменты", link: "/ru/tools/reference" },
+  { text: DOCS_VERSION, link: "/ru/changelog" },
   { text: "Облако", link: "https://mcp-telegram.com" },
 ];
 
@@ -18,6 +23,7 @@ const zhNav = [
   { text: "指南", link: "/zh/getting-started/credentials" },
   { text: "平台", link: "/zh/platforms/claude-desktop" },
   { text: "工具", link: "/zh/tools/reference" },
+  { text: DOCS_VERSION, link: "/zh/changelog" },
   { text: "云版本", link: "https://mcp-telegram.com" },
 ];
 
@@ -54,6 +60,7 @@ const enSidebar = [
     text: "Reference",
     items: [
       { text: "All Tools (59)", link: "/tools/reference" },
+      { text: "Changelog", link: "/changelog" },
       { text: "Troubleshooting", link: "/troubleshooting" },
       { text: "FAQ", link: "/faq" },
     ],
@@ -93,6 +100,7 @@ const ruSidebar = [
     text: "Справочник",
     items: [
       { text: "Все инструменты (59)", link: "/ru/tools/reference" },
+      { text: "Список изменений", link: "/ru/changelog" },
       { text: "Решение проблем", link: "/ru/troubleshooting" },
       { text: "FAQ", link: "/ru/faq" },
     ],
@@ -132,6 +140,7 @@ const zhSidebar = [
     text: "参考",
     items: [
       { text: "所有工具 (59)", link: "/zh/tools/reference" },
+      { text: "更新日志", link: "/zh/changelog" },
       { text: "故障排除", link: "/zh/troubleshooting" },
       { text: "常见问题", link: "/zh/faq" },
     ],
