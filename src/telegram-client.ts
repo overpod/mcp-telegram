@@ -2298,7 +2298,7 @@ export class TelegramService {
         }),
       );
       if (!rawResult || rawResult instanceof Api.messages.StickerSetNotModified) {
-        throw new Error("Sticker set not found");
+        throw new Error("Sticker set not found or not modified");
       }
       const stickerSet = rawResult as Api.messages.StickerSet;
       if (stickerIndex < 0 || stickerIndex >= stickerSet.documents.length) {

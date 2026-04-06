@@ -25,7 +25,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
       try {
         const set = await telegram.getStickerSet(shortName);
         const lines: string[] = [];
-        lines.push(`📦 ${set.title} (${set.shortName})`);
+        lines.push(`📦 ${sanitize(set.title)} (${sanitize(set.shortName)})`);
         lines.push(`${set.count} stickers`);
         lines.push("");
 
@@ -35,7 +35,7 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         }
 
         lines.push("");
-        lines.push(`Send a sticker: telegram-send-sticker(chatId, stickerSet="${set.shortName}", index=N)`);
+        lines.push(`Send a sticker: telegram-send-sticker(chatId, stickerSet="${sanitize(set.shortName)}", index=N)`);
         return ok(sanitize(lines.join("\n")));
       } catch (e) {
         return fail(e);
@@ -66,8 +66,8 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         lines.push(`Found ${sets.length} sticker set(s) for "${query}":\n`);
         for (const set of sets) {
           const flags = "";
-          lines.push(`• ${set.title}${flags} — ${set.count} stickers`);
-          lines.push(`  Short name: ${set.shortName}`);
+          lines.push(`• ${sanitize(set.title)}${flags} — ${set.count} stickers`);
+          lines.push(`  Short name: ${sanitize(set.shortName)}`);
         }
         lines.push("");
         lines.push("Use telegram-get-sticker-set(shortName) to see individual stickers.");
@@ -99,8 +99,8 @@ export function registerStickerTools(server: McpServer, telegram: TelegramServic
         lines.push(`${sets.length} installed sticker set(s):\n`);
         for (const set of sets) {
           const flags = "";
-          lines.push(`• ${set.title}${flags} — ${set.count} stickers`);
-          lines.push(`  Short name: ${set.shortName}`);
+          lines.push(`• ${sanitize(set.title)}${flags} — ${set.count} stickers`);
+          lines.push(`  Short name: ${sanitize(set.shortName)}`);
         }
         return ok(sanitize(lines.join("\n")));
       } catch (e) {
