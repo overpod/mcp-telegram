@@ -7,3 +7,14 @@ mcp.json
 qr-login.html
 qr-login.png
 .npmrc
+
+# Compiled binaries
+mcp-telegram-bin
+mcp-telegram-login
+mcp-telegram-linux-*
+mcp-telegram-darwin-*
+mcp-telegram-windows-*
+mcp-telegram-login-*
+
+# Bun
+
