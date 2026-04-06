@@ -358,7 +358,7 @@ src/
     reactions.ts      -- Reactions
     extras.ts         -- Pin, schedule, polls, topics
     stickers.ts       -- Sticker sets, send, search, browse
-    account.ts        -- Sessions, privacy, auto-delete, profile
+    account.ts        -- Sessions, privacy, auto-delete, profile, chat mute/folders, invite links
     shared.ts         -- Shared utilities
 ```
 
