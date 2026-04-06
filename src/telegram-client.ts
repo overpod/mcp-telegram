@@ -2297,13 +2297,14 @@ export class TelegramService {
           hash: 0,
         }),
       );
-      if (rawResult instanceof Api.messages.StickerSetNotModified) {
-        throw new Error("Sticker set was not modified");
+      if (!rawResult || rawResult instanceof Api.messages.StickerSetNotModified) {
+        throw new Error("Sticker set not found");
       }
-      if (stickerIndex < 0 || stickerIndex >= rawResult.documents.length) {
-        throw new Error(`Sticker index ${stickerIndex} out of range (0-${rawResult.documents.length - 1})`);
+      const stickerSet = rawResult as Api.messages.StickerSet;
+      if (stickerIndex < 0 || stickerIndex >= stickerSet.documents.length) {
+        throw new Error(`Sticker index ${stickerIndex} out of range (0-${stickerSet.documents.length - 1})`);
       }
-      const sticker = rawResult.documents[stickerIndex];
+      const sticker = stickerSet.documents[stickerIndex];
       if (!(sticker instanceof Api.Document)) {
         throw new Error("Selected sticker is not a valid document");
       }
